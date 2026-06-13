@@ -1,0 +1,497 @@
+{
+  "users": [
+    {
+      "id": "u1",
+      "username": "admin",
+      "password": "adminpassword",
+      "name": "Ksw Administrator",
+      "role": "Admin",
+      "phone": "+919876543210"
+    },
+    {
+      "id": "u2",
+      "username": "coordinator",
+      "password": "coordpassword",
+      "name": "Rajesh Kumar",
+      "role": "Coordinator",
+      "phone": "+918765432109"
+    },
+    {
+      "id": "u3",
+      "username": "sponsor",
+      "password": "sponsorpassword",
+      "name": "Amit Sharma",
+      "role": "Sponsor",
+      "phone": "+917654321098"
+    }
+  ],
+  "students": [
+    {
+      "id": "s1",
+      "name": "Aarav Patel",
+      "age": 10,
+      "gender": "Male",
+      "grade": "Class 5",
+      "guardianName": "Ramesh Patel",
+      "phone": "+919812345678",
+      "address": "Slum Area Sector 4, Noida",
+      "status": "Approved",
+      "sponsorId": "sp1",
+      "attendancePercentage": 92.5,
+      "photo": "",
+      "joiningDate": "2025-08-15"
+    },
+    {
+      "id": "s2",
+      "name": "Priya Kumari",
+      "age": 8,
+      "gender": "Female",
+      "grade": "Class 3",
+      "guardianName": "Savitri Devi",
+      "phone": "+919812345679",
+      "address": "Yamuna Bank Slums, Delhi",
+      "status": "Approved",
+      "sponsorId": "sp2",
+      "attendancePercentage": 88,
+      "photo": "",
+      "joiningDate": "2025-09-01"
+    },
+    {
+      "id": "s3",
+      "name": "Kabir Singh",
+      "age": 12,
+      "gender": "Male",
+      "grade": "Class 6",
+      "guardianName": "Harjeet Singh",
+      "phone": "+919812345680",
+      "address": "Kirti Nagar Slums, Delhi",
+      "status": "Approved",
+      "sponsorId": null,
+      "attendancePercentage": 74.2,
+      "photo": "",
+      "joiningDate": "2025-10-10"
+    },
+    {
+      "id": "s4",
+      "name": "Ananya Roy",
+      "age": 9,
+      "gender": "Female",
+      "grade": "Class 4",
+      "guardianName": "Subhash Roy",
+      "phone": "+919812345681",
+      "address": "Kalyanpuri Colony, Delhi",
+      "status": "Pending Approval",
+      "sponsorId": null,
+      "attendancePercentage": 0,
+      "photo": "",
+      "joiningDate": "2026-06-10"
+    },
+    {
+      "id": "s5",
+      "name": "Rohan Das",
+      "age": 11,
+      "gender": "Male",
+      "grade": "Class 5",
+      "guardianName": "Meena Das",
+      "phone": "+919812345682",
+      "address": "Seelampur JJ Cluster, Delhi",
+      "status": "Approved",
+      "sponsorId": "sp1",
+      "attendancePercentage": 95.8,
+      "photo": "",
+      "joiningDate": "2025-06-12"
+    },
+    {
+      "id": "s6",
+      "name": "Sana Sheikh",
+      "age": 7,
+      "gender": "Female",
+      "grade": "Class 2",
+      "guardianName": "Abdul Sheikh",
+      "phone": "+919812345683",
+      "address": "Okhla Vihar Basti, Delhi",
+      "status": "Pending Approval",
+      "sponsorId": null,
+      "attendancePercentage": 0,
+      "photo": "",
+      "joiningDate": "2026-06-12"
+    }
+  ],
+  "teachers": [
+    {
+      "id": "t1",
+      "name": "Sunita Sharma",
+      "email": "sunita@kswpathshala.org",
+      "phone": "+919988776655",
+      "qualification": "B.Ed, BA in English",
+      "assignedClass": "Class 5 & 6",
+      "location": {
+        "latitude": 28.5355,
+        "longitude": 77.391,
+        "classroomName": "Noida Sector 4 Classroom"
+      },
+      "status": "Approved",
+      "joiningDate": "2024-03-10"
+    },
+    {
+      "id": "t2",
+      "name": "Vikram Malhotra",
+      "email": "vikram@kswpathshala.org",
+      "phone": "+919988776644",
+      "qualification": "B.Sc Mathematics",
+      "assignedClass": "Class 3 & 4",
+      "location": {
+        "latitude": 28.6139,
+        "longitude": 77.209,
+        "classroomName": "Yamuna Bank Center"
+      },
+      "status": "Approved",
+      "joiningDate": "2024-07-22"
+    },
+    {
+      "id": "t3",
+      "name": "Neha Gupta",
+      "email": "neha@kswpathshala.org",
+      "phone": "+919988776633",
+      "qualification": "MA in Sociology",
+      "assignedClass": "Class 2",
+      "location": {
+        "latitude": 28.65,
+        "longitude": 77.12,
+        "classroomName": "Kirti Nagar Center"
+      },
+      "status": "Pending Approval",
+      "joiningDate": "2026-06-01"
+    }
+  ],
+  "donations": [
+    {
+      "id": "d1",
+      "donorName": "Amit Sharma",
+      "email": "amit.sharma@gmail.com",
+      "phone": "+919876500111",
+      "amount": 15000,
+      "date": "2026-05-10",
+      "type": "Sponsorship",
+      "studentId": "s1",
+      "status": "Verified",
+      "paymentMethod": "UPI / Net Banking"
+    },
+    {
+      "id": "d2",
+      "donorName": "Karan Johar",
+      "email": "karan@dharma.com",
+      "phone": "+919876500222",
+      "amount": 50000,
+      "date": "2026-05-25",
+      "type": "General Donation",
+      "studentId": null,
+      "status": "Verified",
+      "paymentMethod": "Bank Transfer"
+    },
+    {
+      "id": "d3",
+      "donorName": "Shalini Sen",
+      "email": "shalini.sen@outlook.com",
+      "phone": "+919876500333",
+      "amount": 12000,
+      "date": "2026-06-05",
+      "type": "Sponsorship",
+      "studentId": "s2",
+      "status": "Pending Verification",
+      "paymentMethod": "Credit Card"
+    },
+    {
+      "id": "d4",
+      "donorName": "Rahul Bajaj",
+      "email": "rahul.bajaj@bajaj.com",
+      "phone": "+919876500444",
+      "amount": 35000,
+      "date": "2026-06-11",
+      "type": "General Donation",
+      "studentId": null,
+      "status": "Verified",
+      "paymentMethod": "UPI"
+    }
+  ],
+  "sponsors": [
+    {
+      "id": "sp1",
+      "name": "Amit Sharma",
+      "email": "amit.sharma@gmail.com",
+      "activeSponsorships": 2,
+      "totalDonated": 30000
+    },
+    {
+      "id": "sp2",
+      "name": "Shalini Sen",
+      "email": "shalini.sen@outlook.com",
+      "activeSponsorships": 1,
+      "totalDonated": 12000
+    }
+  ],
+  "attendance": [
+    {
+      "id": "a1",
+      "date": "2026-06-12",
+      "entityType": "Student",
+      "entityId": "s1",
+      "status": "Present"
+    },
+    {
+      "id": "a2",
+      "date": "2026-06-12",
+      "entityType": "Student",
+      "entityId": "s2",
+      "status": "Present"
+    },
+    {
+      "id": "a3",
+      "date": "2026-06-12",
+      "entityType": "Student",
+      "entityId": "s3",
+      "status": "Absent"
+    },
+    {
+      "id": "a4",
+      "date": "2026-06-12",
+      "entityType": "Student",
+      "entityId": "s5",
+      "status": "Present"
+    },
+    {
+      "id": "a5",
+      "date": "2026-06-12",
+      "entityType": "Teacher",
+      "entityId": "t1",
+      "status": "Present"
+    },
+    {
+      "id": "a6",
+      "date": "2026-06-12",
+      "entityType": "Teacher",
+      "entityId": "t2",
+      "status": "Present"
+    },
+    {
+      "id": "a7",
+      "date": "2026-06-13",
+      "entityType": "Student",
+      "entityId": "s1",
+      "status": "Present"
+    },
+    {
+      "id": "a8",
+      "date": "2026-06-13",
+      "entityType": "Student",
+      "entityId": "s2",
+      "status": "Present"
+    },
+    {
+      "id": "a9",
+      "date": "2026-06-13",
+      "entityType": "Student",
+      "entityId": "s3",
+      "status": "Present"
+    },
+    {
+      "id": "a10",
+      "date": "2026-06-13",
+      "entityType": "Student",
+      "entityId": "s5",
+      "status": "Present"
+    },
+    {
+      "id": "a11",
+      "date": "2026-06-13",
+      "entityType": "Teacher",
+      "entityId": "t1",
+      "status": "Present"
+    },
+    {
+      "id": "a12",
+      "date": "2026-06-13",
+      "entityType": "Teacher",
+      "entityId": "t2",
+      "status": "Absent"
+    }
+  ],
+  "gps_logs": [
+    {
+      "id": "g-1781358852063",
+      "teacherId": "t1",
+      "teacherName": "Sunita Sharma",
+      "date": "2026-06-13",
+      "clockInTime": "07:24 pm",
+      "coords": {
+        "latitude": 28.535590909090907,
+        "longitude": 77.39109090909092
+      },
+      "distanceMeters": 13,
+      "verified": true,
+      "remarks": "Clocked in at Noida Sector 4 Classroom"
+    },
+    {
+      "id": "g-1781358849393",
+      "teacherId": "t1",
+      "teacherName": "Sunita Sharma",
+      "date": "2026-06-13",
+      "clockInTime": "07:24 pm",
+      "coords": {
+        "latitude": 28.535590909090907,
+        "longitude": 77.39109090909092
+      },
+      "distanceMeters": 13,
+      "verified": true,
+      "remarks": "Clocked in at Noida Sector 4 Classroom"
+    },
+    {
+      "id": "g1",
+      "teacherId": "t1",
+      "teacherName": "Sunita Sharma",
+      "date": "2026-06-12",
+      "clockInTime": "08:52 AM",
+      "coords": {
+        "latitude": 28.5356,
+        "longitude": 77.3911
+      },
+      "distanceMeters": 15,
+      "verified": true,
+      "remarks": "Clocked in at Sector 4 center"
+    },
+    {
+      "id": "g2",
+      "teacherId": "t2",
+      "teacherName": "Vikram Malhotra",
+      "date": "2026-06-12",
+      "clockInTime": "08:58 AM",
+      "coords": {
+        "latitude": 28.6141,
+        "longitude": 77.2092
+      },
+      "distanceMeters": 28,
+      "verified": true,
+      "remarks": "Clocked in at Yamuna Bank center"
+    },
+    {
+      "id": "g3",
+      "teacherId": "t1",
+      "teacherName": "Sunita Sharma",
+      "date": "2026-06-13",
+      "clockInTime": "08:49 AM",
+      "coords": {
+        "latitude": 28.5354,
+        "longitude": 77.3909
+      },
+      "distanceMeters": 12,
+      "verified": true,
+      "remarks": "Clocked in at Sector 4 center"
+    },
+    {
+      "id": "g4",
+      "teacherId": "t2",
+      "teacherName": "Vikram Malhotra",
+      "date": "2026-06-13",
+      "clockInTime": "09:30 AM",
+      "coords": {
+        "latitude": 28.625,
+        "longitude": 77.221
+      },
+      "distanceMeters": 1400,
+      "verified": false,
+      "remarks": "Too far from Yamuna Bank center"
+    }
+  ],
+  "activities": [
+    {
+      "id": "act1",
+      "title": "Drawing & Painting Session",
+      "description": "Children at the Noida Sector 4 center expressing their creativity with water colors donated by sponsors.",
+      "type": "Photo",
+      "mediaUrl": "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=600&q=80",
+      "class": "Class 5",
+      "teacherName": "Sunita Sharma",
+      "date": "2026-06-10"
+    },
+    {
+      "id": "act2",
+      "title": "Basic Arithmetic Quiz",
+      "description": "Weekly math games verifying classroom addition & multiplication progress.",
+      "type": "Video",
+      "mediaUrl": "https://assets.mixkit.co/videos/preview/mixkit-children-in-class-studying-with-books-and-pencils-34324-large.mp4",
+      "class": "Class 3 & 4",
+      "teacherName": "Vikram Malhotra",
+      "date": "2026-06-11"
+    }
+  ],
+  "audit_logs": [
+    {
+      "id": "log-1781358852093",
+      "userId": "system",
+      "userName": "System Coordinator",
+      "action": "GPS Check-in",
+      "details": "Simulated clock-in for Sunita Sharma (Verified: true, Distance: 13m)",
+      "ipAddress": "127.0.0.1",
+      "timestamp": "2026-06-13T13:54:12.093Z"
+    },
+    {
+      "id": "log-1781358849420",
+      "userId": "system",
+      "userName": "System Coordinator",
+      "action": "GPS Check-in",
+      "details": "Simulated clock-in for Sunita Sharma (Verified: true, Distance: 13m)",
+      "ipAddress": "127.0.0.1",
+      "timestamp": "2026-06-13T13:54:09.420Z"
+    },
+    {
+      "id": "log-1781358644770",
+      "userId": "u1",
+      "userName": "Ksw Administrator",
+      "action": "Admin Login",
+      "details": "Logged in using password from IP",
+      "ipAddress": "127.0.0.1",
+      "timestamp": "2026-06-13T13:50:44.770Z"
+    },
+    {
+      "id": "log1",
+      "userId": "u1",
+      "userName": "admin",
+      "action": "Admin Login",
+      "details": "Successful admin authentication",
+      "ipAddress": "192.168.1.1",
+      "timestamp": "2026-06-13T09:00:00Z"
+    },
+    {
+      "id": "log2",
+      "userId": "u1",
+      "userName": "admin",
+      "action": "Student Approval",
+      "details": "Approved student Rohan Das",
+      "ipAddress": "192.168.1.1",
+      "timestamp": "2026-06-13T09:15:32Z"
+    }
+  ],
+  "notifications": [
+    {
+      "id": "n1",
+      "type": "System",
+      "message": "New student registration request received: Sana Sheikh",
+      "timestamp": "2026-06-12T12:00:00Z",
+      "status": "Unread"
+    },
+    {
+      "id": "n2",
+      "type": "GPS Alert",
+      "message": "Teacher clock-in verification failed: Vikram Malhotra (Out of Range)",
+      "timestamp": "2026-06-13T09:30:15Z",
+      "status": "Unread"
+    },
+    {
+      "id": "n3",
+      "type": "Donation",
+      "message": "New sponsorship donation of ₹12,000 received from Shalini Sen",
+      "timestamp": "2026-06-05T15:20:00Z",
+      "status": "Read"
+    }
+  ]
+}
