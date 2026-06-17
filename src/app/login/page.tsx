@@ -8,6 +8,34 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 
+// ─── Demo Accounts (no API — client-side only) ───────────────────────────────
+const DEMO_USERS = [
+  {
+    id: 'user-001',
+    username: 'admin',
+    password: 'adminpassword',
+    name: 'Rajesh Kumar',
+    role: 'Admin' as const,
+    phone: '+919876543210',
+  },
+  {
+    id: 'user-002',
+    username: 'coordinator',
+    password: 'coordpassword',
+    name: 'Priya Sharma',
+    role: 'Coordinator' as const,
+    phone: '+918765432109',
+  },
+  {
+    id: 'user-003',
+    username: 'sponsor',
+    password: 'sponsorpassword',
+    name: 'Amit Patel',
+    role: 'Sponsor' as const,
+    phone: '+917654321098',
+  },
+];
+
 export default function LoginPage() {
   const router = useRouter();
   const { user, login } = useAppStore();
@@ -18,7 +46,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [otpCode, setOtpCode] = useState('');
-  
+
   // Pipeline flow states
   const [otpSent, setOtpSent] = useState(false);
   const [receivedDemoOtp, setReceivedDemoOtp] = useState<string | null>(null);
@@ -33,7 +61,7 @@ export default function LoginPage() {
     }
   }, [user, router]);
 
-  // Handle standard password login
+  // ── Password login (client-side, no API) ────────────────────────────────────
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username || !password) {
@@ -44,28 +72,34 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
 
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'password', username, password }),
-      });
+    // Simulate a tiny delay for realistic UX
+    await new Promise((r) => setTimeout(r, 600));
 
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Login failed');
-      } else {
-        login(data.user);
-        router.push('/dashboard');
-      }
-    } catch (err) {
-      setError('Connection error. Please try again.');
-    } finally {
+    const found = DEMO_USERS.find(
+      (u) =>
+        u.username.toLowerCase() === username.toLowerCase() &&
+        u.password === password
+    );
+
+    if (!found) {
+      setError('Invalid username or password');
       setLoading(false);
+      return;
     }
+
+    login({
+      id: found.id,
+      username: found.username,
+      name: found.name,
+      role: found.role,
+      phone: found.phone,
+      token: `demo-token-${found.id}`,
+    });
+    router.push('/dashboard');
+    setLoading(false);
   };
 
-  // Trigger simulated OTP
+  // ── Send OTP (client-side, no API) ──────────────────────────────────────────
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!phone) {
@@ -77,30 +111,23 @@ export default function LoginPage() {
     setError('');
     setReceivedDemoOtp(null);
 
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'send-otp', phone }),
-      });
+    await new Promise((r) => setTimeout(r, 700));
 
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'Failed to send OTP');
-      } else {
-        setOtpSent(true);
-        if (data.demoOtp) {
-          setReceivedDemoOtp(data.demoOtp);
-        }
-      }
-    } catch (err) {
-      setError('Failed to contact auth server');
-    } finally {
+    const found = DEMO_USERS.find((u) => u.phone === phone);
+    if (!found) {
+      setError('Phone number not registered in demo accounts');
       setLoading(false);
+      return;
     }
+
+    // Generate a demo 6-digit OTP client-side
+    const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
+    setReceivedDemoOtp(generatedOtp);
+    setOtpSent(true);
+    setLoading(false);
   };
 
-  // Verify OTP
+  // ── Verify OTP (client-side, no API) ────────────────────────────────────────
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!otpCode) {
@@ -108,7 +135,6 @@ export default function LoginPage() {
       return;
     }
 
-    // Verify OTP matches the mock code
     if (receivedDemoOtp && otpCode !== receivedDemoOtp) {
       setError('Invalid OTP code. Please check and try again.');
       return;
@@ -117,28 +143,28 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
 
-    try {
-      const res = await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'verify-otp', phone, otp: otpCode }),
-      });
+    await new Promise((r) => setTimeout(r, 600));
 
-      const data = await res.json();
-      if (!res.ok) {
-        setError(data.error || 'OTP verification failed');
-      } else {
-        login(data.user);
-        router.push('/dashboard');
-      }
-    } catch (err) {
-      setError('Verification connection failed');
-    } finally {
+    const found = DEMO_USERS.find((u) => u.phone === phone);
+    if (!found) {
+      setError('Phone number not registered');
       setLoading(false);
+      return;
     }
+
+    login({
+      id: found.id,
+      username: found.username,
+      name: found.name,
+      role: found.role,
+      phone: found.phone,
+      token: `demo-otp-token-${found.id}`,
+    });
+    router.push('/dashboard');
+    setLoading(false);
   };
 
-  // Quick fill helper for demo ease
+  // ── Quick fill helper for demo ease ─────────────────────────────────────────
   const fillDemoCreds = (role: 'admin' | 'coordinator' | 'sponsor') => {
     setError('');
     setOtpSent(false);
@@ -262,7 +288,10 @@ export default function LoginPage() {
                     <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
                       <p className="font-bold">Simulated WhatsApp SMS Code Sent!</p>
                       <p className="mt-1">
-                        Use OTP: <span className="font-mono bg-emerald-500/20 px-2 py-0.5 rounded text-sm font-bold tracking-widest">{receivedDemoOtp}</span>
+                        Use OTP:{' '}
+                        <span className="font-mono bg-emerald-500/20 px-2 py-0.5 rounded text-sm font-bold tracking-widest">
+                          {receivedDemoOtp}
+                        </span>
                       </p>
                     </div>
                   )}
@@ -286,7 +315,7 @@ export default function LoginPage() {
                       Back
                     </Button>
                     <Button type="submit" className="w-2/3 h-10 font-bold" isLoading={loading}>
-                      Verify & Access
+                      Verify &amp; Access
                     </Button>
                   </div>
                 </form>

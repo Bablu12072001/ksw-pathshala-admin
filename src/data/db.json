@@ -80,7 +80,7 @@
       "guardianName": "Subhash Roy",
       "phone": "+919812345681",
       "address": "Kalyanpuri Colony, Delhi",
-      "status": "Pending Approval",
+      "status": "Approved",
       "sponsorId": null,
       "attendancePercentage": 0,
       "photo": "",
@@ -426,6 +426,69 @@
   ],
   "audit_logs": [
     {
+      "id": "log-1781692557572",
+      "userId": "u1",
+      "userName": "Ksw Administrator",
+      "action": "OTP Verification",
+      "details": "Logged in using OTP verification",
+      "ipAddress": "127.0.0.1",
+      "timestamp": "2026-06-17T10:35:57.572Z"
+    },
+    {
+      "id": "log-1781692548630",
+      "userId": "u1",
+      "userName": "Ksw Administrator",
+      "action": "OTP Request",
+      "details": "OTP verification code triggered for +919876543210",
+      "ipAddress": "127.0.0.1",
+      "timestamp": "2026-06-17T10:35:48.630Z"
+    },
+    {
+      "id": "log-1781692493168",
+      "userId": "u3",
+      "userName": "Amit Sharma",
+      "action": "Admin Login",
+      "details": "Logged in using password from IP",
+      "ipAddress": "127.0.0.1",
+      "timestamp": "2026-06-17T10:34:53.168Z"
+    },
+    {
+      "id": "log-1781692460569",
+      "userId": "u2",
+      "userName": "Rajesh Kumar",
+      "action": "Admin Login",
+      "details": "Logged in using password from IP",
+      "ipAddress": "127.0.0.1",
+      "timestamp": "2026-06-17T10:34:20.569Z"
+    },
+    {
+      "id": "log-1781692446993",
+      "userId": "u1",
+      "userName": "Ksw Administrator",
+      "action": "Admin Login",
+      "details": "Logged in using password from IP",
+      "ipAddress": "127.0.0.1",
+      "timestamp": "2026-06-17T10:34:06.993Z"
+    },
+    {
+      "id": "log-1781691760376",
+      "userId": "system",
+      "userName": "System Coordinator",
+      "action": "Update Student",
+      "details": "Updated student details for Ananya Roy (Action: status)",
+      "ipAddress": "127.0.0.1",
+      "timestamp": "2026-06-17T10:22:40.376Z"
+    },
+    {
+      "id": "log-1781688186212",
+      "userId": "u1",
+      "userName": "Ksw Administrator",
+      "action": "Admin Login",
+      "details": "Logged in using password from IP",
+      "ipAddress": "127.0.0.1",
+      "timestamp": "2026-06-17T09:23:06.212Z"
+    },
+    {
       "id": "log-1781359452842",
       "userId": "u1",
       "userName": "Ksw Administrator",
@@ -544,6 +607,13 @@
     }
   ],
   "notifications": [
+    {
+      "id": "n-1781692548597",
+      "type": "System",
+      "message": "Simulated OTP [581820] sent to +919876543210 for user Ksw Administrator",
+      "timestamp": "2026-06-17T10:35:48.597Z",
+      "status": "Unread"
+    },
     {
       "id": "n-1781359045929",
       "type": "System",
