@@ -11,11 +11,16 @@ import {
   CircleDollarSign,
   MapPin,
   Image as ImageIcon,
+  HeartHandshake,
   BrainCircuit,
   FileText,
   ShieldCheck,
   LogOut,
   Menu,
+  ClipboardList,
+  MonitorPlay,
+  Video,
+  CalendarDays,
 } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
@@ -35,73 +40,50 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
     window.location.href = '/login';
   };
 
-  // Nav items with role requirements
-  const menuItems = [
+  // Nav groups with role requirements
+  const menuGroups = [
     {
-      title: 'Dashboard',
-      icon: LayoutDashboard,
-      path: '/dashboard',
-      roles: ['Admin', 'Coordinator', 'Sponsor'],
+      name: 'Core Operations',
+      items: [
+        { title: 'Dashboard', icon: LayoutDashboard, path: '/dashboard', roles: ['Admin', 'Coordinator', 'Sponsor'] },
+        { title: 'Students', icon: Users, path: '/students', roles: ['Admin', 'Coordinator', 'Sponsor'] },
+        { title: 'Teachers', icon: GraduationCap, path: '/teachers', roles: ['Admin', 'Coordinator'] },
+        { title: 'Volunteers', icon: HeartHandshake, path: '/volunteers', roles: ['Admin', 'Coordinator'] },
+        { title: 'Volunteer Tasks', icon: ClipboardList, path: '/volunteer-tasks', roles: ['Admin', 'Coordinator'] },
+        { title: 'Volunteer Claims', icon: FileText, path: '/volunteer-claims', roles: ['Admin', 'Coordinator'] },
+        { title: 'Attendance', icon: CalendarCheck, path: '/attendance', roles: ['Admin', 'Coordinator'] },
+        { title: 'Events', icon: CalendarDays, path: '/events', roles: ['Admin', 'Coordinator'] },
+        { title: 'Donations & Sponsors', icon: CircleDollarSign, path: '/donations', roles: ['Admin', 'Coordinator', 'Sponsor'] },
+        { title: 'GPS Tracking', icon: MapPin, path: '/gps', roles: ['Admin', 'Coordinator'] },
+      ]
     },
     {
-      title: 'Students',
-      icon: Users,
-      path: '/students',
-      roles: ['Admin', 'Coordinator', 'Sponsor'],
+      name: 'Website CMS',
+      items: [
+        { title: 'Homepage Sliders', icon: MonitorPlay, path: '/sliders', roles: ['Admin', 'Coordinator'] },
+        { title: 'Intro Videos', icon: Video, path: '/intro-videos', roles: ['Admin', 'Coordinator'] },
+        { title: 'Board Members', icon: Users, path: '/members', roles: ['Admin', 'Coordinator'] },
+        { title: 'Activities Feed', icon: ImageIcon, path: '/activities', roles: ['Admin', 'Coordinator', 'Sponsor'] },
+        { title: 'Reports Hub', icon: FileText, path: '/reports', roles: ['Admin', 'Coordinator', 'Sponsor'] },
+      ]
     },
     {
-      title: 'Teachers',
-      icon: GraduationCap,
-      path: '/teachers',
-      roles: ['Admin', 'Coordinator'],
-    },
-    {
-      title: 'Attendance',
-      icon: CalendarCheck,
-      path: '/attendance',
-      roles: ['Admin', 'Coordinator'],
-    },
-    {
-      title: 'Donations & Sponsors',
-      icon: CircleDollarSign,
-      path: '/donations',
-      roles: ['Admin', 'Coordinator', 'Sponsor'],
-    },
-    {
-      title: 'GPS Tracking',
-      icon: MapPin,
-      path: '/gps',
-      roles: ['Admin', 'Coordinator'],
-    },
-    {
-      title: 'Activities Feed',
-      icon: ImageIcon,
-      path: '/activities',
-      roles: ['Admin', 'Coordinator', 'Sponsor'],
-    },
-    {
-      title: 'AI Insights',
-      icon: BrainCircuit,
-      path: '/ai',
-      roles: ['Admin', 'Coordinator', 'Sponsor'],
-    },
-    {
-      title: 'Reports Hub',
-      icon: FileText,
-      path: '/reports',
-      roles: ['Admin', 'Coordinator', 'Sponsor'],
-    },
-    {
-      title: 'Audit & Backup',
-      icon: ShieldCheck,
-      path: '/audit',
-      roles: ['Admin'],
-    },
+      name: 'System',
+      items: [
+        { title: 'AI Insights', icon: BrainCircuit, path: '/ai', roles: ['Admin', 'Coordinator', 'Sponsor'] },
+        { title: 'Audit & Backup', icon: ShieldCheck, path: '/audit', roles: ['Admin'] },
+      ]
+    }
   ];
 
-  // Filter items based on active role
-  const userRole = user?.role || 'Admin';
-  const filteredItems = menuItems.filter((item) => item.roles.includes(userRole));
+  // Filter items based on active role (case-insensitive)
+  const userRole = (user?.role || 'admin').toLowerCase();
+  const filteredGroups = menuGroups
+    .map(group => ({
+      ...group,
+      items: group.items.filter(item => item.roles.some(r => r.toLowerCase() === userRole))
+    }))
+    .filter(group => group.items.length > 0);
 
   return (
     <>
@@ -111,7 +93,7 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
           variant="secondary"
           size="sm"
           onClick={() => setIsOpen(!isOpen)}
-          className="p-2 h-auto rounded-lg shadow-md glass-panel"
+          className="p-2 h-auto rounded-xl shadow-lg bg-background/80 backdrop-blur-md border border-border"
         >
           <Menu className="h-5 w-5 text-foreground" />
         </Button>
@@ -120,7 +102,7 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
       {/* Backdrop for mobile */}
       {isOpen && (
         <div
-          className="lg:hidden fixed inset-0 z-40 bg-slate-950/20 backdrop-blur-xxs"
+          className="lg:hidden fixed inset-0 z-40 bg-slate-950/60 backdrop-blur-sm transition-opacity duration-300"
           onClick={() => setIsOpen(false)}
         />
       )}
@@ -128,69 +110,96 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
       {/* Sidebar Container */}
       <aside
         className={cn(
-          'fixed inset-y-0 left-0 z-40 flex flex-col w-64 border-r border-border/60 transition-transform duration-300 ease-in-out lg:translate-x-0 glass-panel h-screen',
+          'fixed inset-y-0 left-0 z-40 flex flex-col w-64 bg-card text-card-foreground shadow-[4px_0_24px_-10px_rgba(0,0,0,0.15)] border-r border-border/50 transition-transform duration-300 ease-in-out lg:translate-x-0 h-screen overflow-hidden',
           isOpen ? 'translate-x-0' : '-translate-x-full'
         )}
       >
+        {/* Subtle background glow effect for beauty */}
+        <div className="absolute top-0 left-0 w-full h-48 bg-gradient-to-b from-primary/10 to-transparent pointer-events-none opacity-50 dark:opacity-20" />
+
         {/* Header/Logo */}
-        <div className="flex items-center justify-between h-16 px-6 border-b border-border/40">
-          <Link href="/dashboard" className="flex items-center space-x-2">
-            <span className="h-8 w-8 rounded-lg bg-primary flex items-center justify-center text-primary-foreground font-bold shadow-md shadow-primary/30">
-              KSW
-            </span>
-            <span className="font-bold text-base tracking-tight text-foreground">
-              Pathshala <span className="text-primary font-medium text-xs">Admin</span>
-            </span>
+        <div className="flex items-center justify-center h-20 px-6 relative z-10 shrink-0">
+          <Link href="/dashboard" className="flex items-center space-x-3 group">
+            <div className="h-12 w-12 bg-white rounded-xl flex items-center justify-center shadow-lg shadow-primary/30 transform transition-transform group-hover:scale-105 overflow-hidden p-1">
+              <img src="/logo.jpg" alt="KSW Pathshala Logo" className="w-full h-full object-contain" />
+            </div>
+            <div className="flex flex-col">
+              <span className="font-extrabold text-lg tracking-tight leading-none text-foreground">
+                Pathshala
+              </span>
+              <span className="text-primary font-bold text-xs tracking-widest uppercase mt-0.5">
+                Admin
+              </span>
+            </div>
           </Link>
         </div>
 
         {/* Navigation Links */}
-        <nav className="flex-1 px-4 py-6 space-y-1 overflow-y-auto">
-          {filteredItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = pathname === item.path || pathname?.startsWith(item.path + '/');
-            return (
-              <Link
-                key={item.title}
-                href={item.path}
-                onClick={() => setIsOpen(false)}
-                className={cn(
-                  'flex items-center px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 group cursor-pointer',
-                  isActive
-                    ? 'bg-primary text-primary-foreground shadow-md shadow-primary/10'
-                    : 'text-muted-foreground hover:bg-secondary/40 hover:text-foreground'
-                )}
-              >
-                <Icon className={cn('mr-3 h-5 w-5 flex-shrink-0 transition-transform duration-200 group-hover:scale-105', isActive ? 'text-primary-foreground' : 'text-muted-foreground group-hover:text-foreground')} />
-                {item.title}
-              </Link>
-            );
-          })}
+        <nav className="flex-1 px-3 py-2 space-y-4 overflow-y-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent relative z-10">
+          {filteredGroups.map((group, groupIdx) => (
+            <div key={group.name} className={groupIdx > 0 ? "pt-2" : ""}>
+              <div className="px-4 mb-2 text-xxs font-black tracking-widest text-muted-foreground/60 uppercase">
+                {group.name}
+              </div>
+              <div className="space-y-1.5">
+                {group.items.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = pathname === item.path || pathname?.startsWith(item.path + '/');
+                  return (
+                    <Link
+                      key={item.title}
+                      href={item.path}
+                      onClick={() => setIsOpen(false)}
+                      className={cn(
+                        'flex items-center px-4 py-2.5 rounded-xl text-sm font-semibold transition-all duration-300 group cursor-pointer relative overflow-hidden',
+                        isActive
+                          ? 'bg-gradient-to-r from-primary to-primary/90 text-white shadow-md shadow-primary/25'
+                          : 'text-muted-foreground hover:bg-secondary/50 hover:text-foreground'
+                      )}
+                    >
+                      {isActive && (
+                        <span className="absolute left-0 top-1/2 -translate-y-1/2 w-1.5 h-8 bg-white/30 rounded-r-full" />
+                      )}
+                      <Icon
+                        className={cn(
+                          'mr-3 h-[18px] w-[18px] flex-shrink-0 transition-transform duration-300 group-hover:scale-110',
+                          isActive ? 'text-white' : 'text-muted-foreground group-hover:text-primary'
+                        )}
+                      />
+                      <span className="relative z-10">{item.title}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
         {/* Footer Profile & Logout */}
-        <div className="p-4 border-t border-border/40 bg-secondary/10">
-          <div className="flex items-center space-x-3 mb-3 px-2">
-            <div className="h-9 w-9 rounded-full bg-gradient-to-tr from-indigo-500 to-purple-500 flex items-center justify-center text-white font-semibold text-sm shadow-md">
-              {user?.name ? user.name[0] : 'A'}
+        <div className="p-4 relative z-10">
+          <div className="bg-secondary/40 rounded-2xl p-3 border border-border/50 backdrop-blur-md">
+            <div className="flex items-center space-x-3 mb-3">
+              <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-indigo-500 to-purple-600 flex items-center justify-center text-white font-bold text-lg shadow-md border border-white/10">
+                {user?.name ? user.name[0].toUpperCase() : 'A'}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-extrabold text-foreground truncate leading-tight">
+                  {user?.name || 'KSW Admin'}
+                </p>
+                <p className="text-xs font-semibold text-primary/80 mt-0.5 truncate capitalize">
+                  {user?.role || 'Administrator'}
+                </p>
+              </div>
             </div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs font-bold text-foreground truncate leading-none mb-1">
-                {user?.name || 'KSW Admin'}
-              </p>
-              <span className="inline-block px-1.5 py-0.5 rounded-full text-xxs font-semibold bg-primary/15 text-primary">
-                {user?.role || 'Admin'}
-              </span>
-            </div>
+            <Button
+              variant="destructive"
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center font-bold shadow-md shadow-destructive/20 hover:shadow-destructive/40 transition-all rounded-xl h-10"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              Sign Out
+            </Button>
           </div>
-          <Button
-            variant="ghost"
-            onClick={handleLogout}
-            className="w-full flex items-center justify-start text-muted-foreground hover:text-destructive hover:bg-destructive/10 text-xs px-2.5 py-2"
-          >
-            <LogOut className="mr-3.5 h-4 w-4" />
-            Logout Session
-          </Button>
         </div>
       </aside>
     </>

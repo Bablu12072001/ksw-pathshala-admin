@@ -10,6 +10,18 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
+import { Pagination } from '@/components/ui/pagination';
+import { gpsService, teachersService } from '@/services';
+import dynamic from 'next/dynamic';
+
+const MapComponent = dynamic(() => import('@/components/MapComponent'), { 
+  ssr: false,
+  loading: () => (
+    <div className="w-full h-[300px] bg-secondary/20 animate-pulse rounded-lg flex items-center justify-center">
+      <MapPin className="h-8 w-8 text-muted-foreground/30 animate-bounce" />
+    </div>
+  )
+});
 
 export default function GpsPage() {
   const queryClient = useQueryClient();
@@ -19,28 +31,28 @@ export default function GpsPage() {
   const [mockLat, setMockLat] = useState('');
   const [mockLng, setMockLng] = useState('');
   const [simulateSuccess, setSimulateSuccess] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  // 1. Fetch GPS logs and approved teachers list
-  const { data: gpsData, isLoading } = useQuery({
+  // 1. Fetch GPS logs via Axios admin API
+  const { data: gpsLogsRaw, isLoading: loadingGps } = useQuery({
     queryKey: ['gpsLogs'],
-    queryFn: async () => {
-      const res = await fetch('/api/gps');
-      if (!res.ok) throw new Error('Failed to fetch GPS records');
-      return res.json();
-    },
+    queryFn: () => gpsService.getAll().then((r) => r.data),
   });
+  const gpsLogs = Array.isArray(gpsLogsRaw) ? gpsLogsRaw : (gpsLogsRaw?.logs || []);
 
-  // Clock-in mutation
+  const { data: teachersDataRaw, isLoading: loadingTeachers } = useQuery({
+    queryKey: ['teachers'],
+    queryFn: () => teachersService.getAll().then((r) => r.data),
+  });
+  
+  const teachersData = Array.isArray(teachersDataRaw) ? teachersDataRaw : (teachersDataRaw?.teachers || []);
+  
+  const isLoading = loadingGps || loadingTeachers;
+
+  // Clock-in mutation via Axios admin API
   const clockInMutation = useMutation({
-    mutationFn: async (payload: any) => {
-      const res = await fetch('/api/gps', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error('Clock-in post failed');
-      return res.json();
-    },
+    mutationFn: (payload: { teacherId: string; latitude: number; longitude: number }) =>
+      gpsService.clockIn(payload).then((r) => r.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['gpsLogs'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
@@ -53,10 +65,10 @@ export default function GpsPage() {
   // Auto-fill teacher target coordinates when selected
   const handleTeacherChange = (id: string) => {
     setSelectedTeacherId(id);
-    const teacher = gpsData?.teachers?.find((t: any) => t.id === id);
-    if (teacher) {
-      setMockLat(String(teacher.location.latitude));
-      setMockLng(String(teacher.location.longitude));
+    const teacher = teachersData?.find((t: any) => t.id === id);
+    if (teacher && teacher.gpsTargetLocation) {
+      setMockLat(String(teacher.gpsTargetLocation.latitude || '28.6139'));
+      setMockLng(String(teacher.gpsTargetLocation.longitude || '77.2090'));
     } else {
       setMockLat('');
       setMockLng('');
@@ -65,13 +77,13 @@ export default function GpsPage() {
 
   // Alter coordinates slightly to simulate distance offsets
   const applyOffset = (meters: number) => {
-    const teacher = gpsData?.teachers?.find((t: any) => t.id === selectedTeacherId);
-    if (!teacher) return;
+    const teacher = teachersData?.find((t: any) => t.id === selectedTeacherId);
+    if (!teacher || !teacher.gpsTargetLocation) return;
     
     // Roughly, 0.00001 degrees is ~1.1 meters
     const offset = (meters / 1.1) * 0.00001;
-    setMockLat(String(teacher.location.latitude + offset));
-    setMockLng(String(teacher.location.longitude + offset));
+    setMockLat(String(Number(teacher.gpsTargetLocation.latitude || 28.6139) + offset));
+    setMockLng(String(Number(teacher.gpsTargetLocation.longitude || 77.2090) + offset));
   };
 
   const handleSimulate = (e: React.FormEvent) => {
@@ -84,20 +96,22 @@ export default function GpsPage() {
     });
   };
 
-  const teacherOptions = gpsData?.teachers
+  const teacherOptions = teachersData
     ? [
         { label: 'Select Active Teacher...', value: '' },
-        ...gpsData.teachers.map((t: any) => ({ label: `${t.name} (${t.location.classroomName})`, value: t.id })),
+        ...teachersData.map((t: any) => ({ label: `${t.fullName || t.name} (${t.assignedClass})`, value: t.id })),
       ]
     : [{ label: 'Select Active Teacher...', value: '' }];
 
-  const activeTeacher = gpsData?.teachers?.find((t: any) => t.id === selectedTeacherId);
+  const activeTeacher = teachersData?.find((t: any) => t.id === selectedTeacherId);
   
   // Calculate offset vector for map visualization
   let relativeOffset = { x: 0, y: 0, distance: 0, verified: true };
   if (activeTeacher && mockLat && mockLng) {
-    const latDiff = Number(mockLat) - activeTeacher.location.latitude;
-    const lngDiff = Number(mockLng) - activeTeacher.location.longitude;
+    const baseLat = Number(activeTeacher.gpsTargetLocation?.latitude || 28.6139);
+    const baseLng = Number(activeTeacher.gpsTargetLocation?.longitude || 77.2090);
+    const latDiff = Number(mockLat) - baseLat;
+    const lngDiff = Number(mockLng) - baseLng;
     // Scale coordinate differences to fits nicely in visual canvas grid bounds (max 300 meters)
     // 0.00001 deg difference is ~1.1m, so diff / 0.00001 * 1.1 gives meters
     const dy = (latDiff / 0.00001) * 1.1;
@@ -173,52 +187,6 @@ export default function GpsPage() {
                   />
                 </div>
 
-                {selectedTeacherId && (
-                  <div className="space-y-2">
-                    <label className="text-xxs font-bold text-muted-foreground uppercase tracking-wide">
-                      Simulate Location Offsets
-                    </label>
-                    <div className="grid grid-cols-3 gap-2">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => applyOffset(10)}
-                        className="text-xxs py-1 h-auto cursor-pointer"
-                      >
-                        Near (10 meters)
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => applyOffset(90)}
-                        className="text-xxs py-1 h-auto cursor-pointer"
-                      >
-                        Boundary (90m)
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => applyOffset(450)}
-                        className="text-xxs py-1 h-auto text-destructive border-destructive/35 hover:bg-destructive/15 cursor-pointer"
-                      >
-                        Breach (450m)
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                <Button
-                  type="submit"
-                  className="w-full h-10 font-bold"
-                  disabled={!selectedTeacherId}
-                  isLoading={clockInMutation.isPending}
-                >
-                  <Navigation className="mr-1.5 h-4 w-4" />
-                  Trigger Clock-in Event
-                </Button>
               </form>
             </CardContent>
           </Card>
@@ -234,33 +202,22 @@ export default function GpsPage() {
                 Visualizing clock-in point (Blue Navigation icon) relative to Center bounds (Target bullseye).
               </CardDescription>
             </CardHeader>
-            <CardContent className="flex-1 flex flex-col items-center justify-center p-6 relative">
-              <div className="w-full max-w-[280px] h-[220px] rounded-lg border border-border/80 bg-secondary/15 relative overflow-hidden flex items-center justify-center">
-                {/* Target Bullseye Center */}
-                <div className="h-6 w-6 rounded-full bg-indigo-500/10 border-2 border-indigo-500 flex items-center justify-center z-10 shadow-lg">
-                  <div className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
+            <CardContent className="flex-1 flex flex-col items-center justify-center p-4 relative min-h-[300px]">
+              {selectedTeacherId && activeTeacher ? (
+                <MapComponent 
+                  targetLat={Number(activeTeacher.gpsTargetLocation?.latitude || 28.6139)}
+                  targetLng={Number(activeTeacher.gpsTargetLocation?.longitude || 77.2090)}
+                  mockLat={mockLat ? Number(mockLat) : undefined}
+                  mockLng={mockLng ? Number(mockLng) : undefined}
+                  radius={100}
+                />
+              ) : (
+                <div className="w-full h-full min-h-[300px] rounded-lg border border-border/80 bg-secondary/15 flex flex-col items-center justify-center text-muted-foreground p-6 text-center">
+                  <MapPin className="h-10 w-10 text-muted-foreground/40 mb-3" />
+                  <p className="text-sm font-semibold">No Teacher Selected</p>
+                  <p className="text-xs mt-1">Select a teacher from the simulator panel to view their assigned center location and clock-in simulations.</p>
                 </div>
-                
-                {/* Geofence fence bounds (100 meters) */}
-                <div className="absolute h-[120px] w-[120px] rounded-full border-2 border-dashed border-emerald-500/35 bg-emerald-500/5 animate-pulse" />
-
-                {/* Simulated Location Point */}
-                {selectedTeacherId && (
-                  <div
-                    className="absolute z-20 flex flex-col items-center transition-all duration-300"
-                    style={{
-                      transform: `translate(${relativeOffset.x}px, ${relativeOffset.y}px)`,
-                    }}
-                  >
-                    <Navigation className={`h-5 w-5 fill-current ${relativeOffset.verified ? 'text-primary' : 'text-destructive'} transform rotate-45 animate-bounce`} />
-                  </div>
-                )}
-                
-                {/* Scale Grid Overlay */}
-                <div className="absolute bottom-1 right-2 text-xxxxs text-muted-foreground/60">
-                  Radius circle = 100 meters
-                </div>
-              </div>
+              )}
 
               {/* Offset diagnostics summary */}
               {selectedTeacherId && (
@@ -298,7 +255,7 @@ export default function GpsPage() {
               <div className="flex h-40 items-center justify-center">
                 <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
               </div>
-            ) : !gpsData?.logs || gpsData.logs.length === 0 ? (
+            ) : !gpsLogs || gpsLogs.length === 0 ? (
               <p className="text-center text-xs py-10 text-muted-foreground">No check-in logs today.</p>
             ) : (
               <Table>
@@ -307,47 +264,58 @@ export default function GpsPage() {
                     <TableHead className="text-xs font-bold">Teacher</TableHead>
                     <TableHead className="text-xs font-bold">Date / Time</TableHead>
                     <TableHead className="text-xs font-bold">Coordinates</TableHead>
-                    <TableHead className="text-xs font-bold">Variance</TableHead>
                     <TableHead className="text-xs font-bold">Validation</TableHead>
                     <TableHead className="text-xs font-bold">Remarks</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {gpsData.logs.map((log: any) => (
-                    <TableRow key={log.id} className={log.verified ? '' : 'bg-red-500/5'}>
-                      <TableCell className="py-3 font-semibold text-xs text-foreground">
-                        {log.teacherName}
-                      </TableCell>
-                      <TableCell className="py-3 text-xs">
-                        <div>{log.date}</div>
-                        <div className="text-xxs text-muted-foreground">{log.clockInTime}</div>
-                      </TableCell>
-                      <TableCell className="py-3 text-xxs font-mono text-muted-foreground">
-                        {log.coords.latitude.toFixed(5)}, {log.coords.longitude.toFixed(5)}
-                      </TableCell>
-                      <TableCell className={`py-3 text-xs font-bold ${log.verified ? 'text-emerald-500' : 'text-destructive'}`}>
-                        {log.distanceMeters}m
-                      </TableCell>
-                      <TableCell className="py-3">
-                        {log.verified ? (
-                          <Badge variant="success" className="flex w-fit items-center space-x-1">
-                            <CheckCircle className="h-3 w-3" />
-                            <span>Verified</span>
-                          </Badge>
-                        ) : (
-                          <Badge variant="destructive" className="flex w-fit items-center space-x-1">
-                            <ShieldAlert className="h-3 w-3 animate-pulse" />
-                            <span>Failed</span>
-                          </Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="py-3 text-xxs text-muted-foreground max-w-xs truncate">
-                        {log.remarks}
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                  {(() => {
+                    const paginatedLogs = gpsLogs.slice((currentPage - 1) * 10, currentPage * 10);
+                    return paginatedLogs.map((log: any) => {
+                      const teacher = teachersData?.find((t: any) => t.id === log.teacherId);
+                      const isVerified = log.status === 'Inside Geofence';
+                      const dateObj = new Date(log.timestamp);
+                      return (
+                        <TableRow key={log.id} className={isVerified ? '' : 'bg-red-500/5'}>
+                          <TableCell className="py-3 font-semibold text-xs text-foreground">
+                            {teacher ? (teacher.fullName || teacher.name) : 'Unknown'}
+                          </TableCell>
+                          <TableCell className="py-3 text-xs">
+                            <div>{dateObj.toLocaleDateString()}</div>
+                            <div className="text-xxs text-muted-foreground">{dateObj.toLocaleTimeString()}</div>
+                          </TableCell>
+                          <TableCell className="py-3 text-xxs font-mono text-muted-foreground">
+                            {log.latitude ? log.latitude.toFixed(5) : '0.00000'}, {log.longitude ? log.longitude.toFixed(5) : '0.00000'}
+                          </TableCell>
+                          <TableCell className="py-3">
+                            {isVerified ? (
+                              <Badge variant="success" className="flex w-fit items-center space-x-1">
+                                <CheckCircle className="h-3 w-3" />
+                                <span>Verified</span>
+                              </Badge>
+                            ) : (
+                              <Badge variant="destructive" className="flex w-fit items-center space-x-1">
+                                <ShieldAlert className="h-3 w-3 animate-pulse" />
+                                <span>Failed</span>
+                              </Badge>
+                            )}
+                          </TableCell>
+                          <TableCell className="py-3 text-xxs text-muted-foreground max-w-xs truncate">
+                            {log.status}
+                          </TableCell>
+                        </TableRow>
+                      );
+                    });
+                  })()}
                 </TableBody>
               </Table>
+            )}
+            {!isLoading && gpsLogs && (
+              <Pagination
+                currentPage={currentPage}
+                totalItems={gpsLogs.length}
+                onPageChange={setCurrentPage}
+              />
             )}
           </CardContent>
         </Card>

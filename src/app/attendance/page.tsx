@@ -10,6 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
+import { Pagination } from '@/components/ui/pagination';
+import { studentsService, teachersService, attendanceService } from '@/services';
 
 export default function AttendancePage() {
   const queryClient = useQueryClient();
@@ -22,37 +24,28 @@ export default function AttendancePage() {
   // Local checklist draft state
   const [attendanceDraft, setAttendanceDraft] = useState<{ [entityId: string]: 'Present' | 'Absent' }>({});
   const [saveSuccess, setSaveSuccess] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  // 1. Fetch Students (for checklist)
+  // 1. Fetch Students via Axios admin API
   const { data: studentsData, isLoading: loadingStudents } = useQuery({
     queryKey: ['attendanceStudents', gradeFilter],
-    queryFn: async () => {
-      const res = await fetch(`/api/students?grade=${gradeFilter}&status=Approved`);
-      if (!res.ok) throw new Error('Error fetching students');
-      return res.json();
-    },
+    queryFn: () =>
+      studentsService.getAll({ grade: gradeFilter, status: 'Approved' }).then((r) => r.data),
     enabled: entityType === 'Student',
   });
 
-  // 2. Fetch Teachers (for checklist)
+  // 2. Fetch Teachers via Axios admin API
   const { data: teachersData, isLoading: loadingTeachers } = useQuery({
     queryKey: ['attendanceTeachers'],
-    queryFn: async () => {
-      const res = await fetch('/api/teachers?status=Approved');
-      if (!res.ok) throw new Error('Error fetching teachers');
-      return res.json();
-    },
+    queryFn: () => teachersService.getAll({ status: 'Approved' }).then((r) => r.data),
     enabled: entityType === 'Teacher',
   });
 
-  // 3. Fetch existing attendance records for the selected date
+  // 3. Fetch existing attendance records
   const { data: existingRecordsData, isLoading: loadingExisting } = useQuery({
     queryKey: ['existingAttendance', selectedDate, entityType],
-    queryFn: async () => {
-      const res = await fetch(`/api/attendance?date=${selectedDate}&entityType=${entityType}`);
-      if (!res.ok) throw new Error('Error fetching attendance records');
-      return res.json();
-    },
+    queryFn: () =>
+      attendanceService.getByDate(selectedDate, entityType).then((r) => r.data),
   });
 
   // Sync draft from DB records or set defaults when database records update
@@ -71,9 +64,10 @@ export default function AttendancePage() {
     }
 
     // Overwrite with existing database records if they exist
-    if (existingRecordsData?.records && existingRecordsData.records.length > 0) {
-      existingRecordsData.records.forEach((rec: any) => {
-        draft[rec.entityId] = rec.status;
+    const records = Array.isArray(existingRecordsData) ? existingRecordsData : (existingRecordsData?.records || []);
+    if (records.length > 0) {
+      records.forEach((rec: any) => {
+        draft[rec.refId || rec.entityId] = rec.status;
       });
     }
 
@@ -81,17 +75,9 @@ export default function AttendancePage() {
     setSaveSuccess(false);
   }, [studentsData, teachersData, existingRecordsData, entityType]);
 
-  // Submit Mutation
+  // Submit Mutation via Axios admin API
   const submitMutation = useMutation({
-    mutationFn: async (payload: any) => {
-      const res = await fetch('/api/attendance', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error('Failed to save attendance');
-      return res.json();
-    },
+    mutationFn: (payload: any) => attendanceService.submit(payload).then((r) => r.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['existingAttendance'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
@@ -119,14 +105,16 @@ export default function AttendancePage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const records = Object.entries(attendanceDraft).map(([entityId, status]) => ({
-      entityId,
-      status,
+    
+    // Ensure we send records for all active entities, not just the ones explicitly toggled
+    const records = activeList.map((entity: any) => ({
+      refId: entity.id,
+      entityType: entityType,
+      status: attendanceDraft[entity.id] || 'Present',
     }));
 
     submitMutation.mutate({
       date: selectedDate,
-      entityType,
       records,
     });
   };
@@ -242,81 +230,91 @@ export default function AttendancePage() {
               </div>
             ) : (
               <form onSubmit={handleSubmit}>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="text-xs font-bold">Name</TableHead>
-                      <TableHead className="text-xs font-bold">
-                        {entityType === 'Student' ? 'Guardian & Phone' : 'Assigned Class'}
-                      </TableHead>
-                      <TableHead className="text-xs font-bold">Status Badge</TableHead>
-                      <TableHead className="text-xs font-bold text-right">
-                        <div className="flex items-center justify-end space-x-2">
-                          <button
-                            type="button"
-                            onClick={() => setAllStatus('Present')}
-                            className="text-xxxxs font-bold uppercase tracking-wider text-emerald-500 hover:underline cursor-pointer"
-                          >
-                            All Present
-                          </button>
-                          <span className="text-muted-foreground">|</span>
-                          <button
-                            type="button"
-                            onClick={() => setAllStatus('Absent')}
-                            className="text-xxxxs font-bold uppercase tracking-wider text-destructive hover:underline cursor-pointer"
-                          >
-                            All Absent
-                          </button>
-                        </div>
-                      </TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {activeList.map((entity: any) => {
-                      const isPresent = attendanceDraft[entity.id] === 'Present';
-                      return (
-                        <TableRow key={entity.id}>
-                          <TableCell className="py-3 font-semibold text-xs text-foreground">
-                            {entity.name}
-                          </TableCell>
-                          <TableCell className="py-3 text-xs text-muted-foreground">
-                            {entityType === 'Student' ? entity.guardianName : entity.assignedClass}
-                          </TableCell>
-                          <TableCell className="py-3">
-                            <Badge variant={isPresent ? 'success' : 'destructive'}>
-                              {attendanceDraft[entity.id] || 'Present'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="py-3 text-right">
-                            <div className="flex items-center justify-end space-x-1.5">
-                              <button
-                                type="button"
-                                onClick={() => toggleStatus(entity.id)}
-                                className={`h-8 px-3.5 text-xxs font-bold rounded-lg border transition-all cursor-pointer flex items-center ${
-                                  isPresent
-                                    ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20'
-                                    : 'bg-destructive/10 border-destructive/20 text-destructive hover:bg-destructive/20'
-                                }`}
-                              >
-                                {isPresent ? (
-                                  <>
-                                    <Check className="mr-1 h-3.5 w-3.5" />
-                                    Present
-                                  </>
-                                ) : (
-                                  <>
-                                    <X className="mr-1 h-3.5 w-3.5" />
-                                    Absent
-                                  </>
-                                )}
-                              </button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead className="text-xs font-bold">Name</TableHead>
+                        <TableHead className="text-xs font-bold">
+                          {entityType === 'Student' ? 'Guardian & Phone' : 'Assigned Class'}
+                        </TableHead>
+                        <TableHead className="text-xs font-bold">Status Badge</TableHead>
+                        <TableHead className="text-xs font-bold text-right">
+                          <div className="flex items-center justify-end space-x-2">
+                            <button
+                              type="button"
+                              onClick={() => setAllStatus('Present')}
+                              className="text-xxxxs font-bold uppercase tracking-wider text-emerald-500 hover:underline cursor-pointer"
+                            >
+                              All Present
+                            </button>
+                            <span className="text-muted-foreground">|</span>
+                            <button
+                              type="button"
+                              onClick={() => setAllStatus('Absent')}
+                              className="text-xxxxs font-bold uppercase tracking-wider text-destructive hover:underline cursor-pointer"
+                            >
+                              All Absent
+                            </button>
+                          </div>
+                        </TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(() => {
+                        const paginatedList = activeList.slice((currentPage - 1) * 10, currentPage * 10);
+                        return paginatedList.map((entity: any) => {
+                          const isPresent = attendanceDraft[entity.id] === 'Present';
+                          return (
+                            <TableRow key={entity.id}>
+                              <TableCell className="py-3 font-semibold text-xs text-foreground">
+                                {entity.fullName || entity.name}
+                              </TableCell>
+                              <TableCell className="py-3 text-xs text-muted-foreground">
+                                {entityType === 'Student' ? entity.guardianName : entity.assignedClass}
+                              </TableCell>
+                              <TableCell className="py-3">
+                                <Badge variant={isPresent ? 'success' : 'destructive'}>
+                                  {attendanceDraft[entity.id] || 'Present'}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="py-3 text-right">
+                                <div className="flex items-center justify-end space-x-1.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => toggleStatus(entity.id)}
+                                    className={`h-8 px-3.5 text-xxs font-bold rounded-lg border transition-all cursor-pointer flex items-center ${
+                                      isPresent
+                                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20'
+                                        : 'bg-destructive/10 border-destructive/20 text-destructive hover:bg-destructive/20'
+                                    }`}
+                                  >
+                                    {isPresent ? (
+                                      <>
+                                        <Check className="mr-1 h-3.5 w-3.5" />
+                                        Present
+                                      </>
+                                    ) : (
+                                      <>
+                                        <X className="mr-1 h-3.5 w-3.5" />
+                                        Absent
+                                      </>
+                                    )}
+                                  </button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        });
+                      })()}
+                    </TableBody>
+                  </Table>
+                </div>
+                <Pagination
+                  currentPage={currentPage}
+                  totalItems={activeList.length}
+                  onPageChange={setCurrentPage}
+                />
                 <div className="p-4 border-t border-border flex justify-end bg-secondary/10">
                   <Button
                     type="submit"

@@ -9,24 +9,21 @@ import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
 import { exportToExcel, exportToPDF } from '@/lib/export-utils';
+import { studentsService, teachersService, donationsService, gpsService } from '@/services';
 
 type ReportCategory = 'students' | 'teachers' | 'donations' | 'gps';
 
 export default function ReportsPage() {
   const [category, setCategory] = useState<ReportCategory>('students');
 
-  // Fetch report data dynamically based on selection
+  // Fetch report data via Axios admin API based on selection
   const { data, isLoading } = useQuery({
     queryKey: ['reportData', category],
     queryFn: async () => {
-      let url = '/api/students';
-      if (category === 'teachers') url = '/api/teachers';
-      else if (category === 'donations') url = '/api/donations';
-      else if (category === 'gps') url = '/api/gps';
-
-      const res = await fetch(url);
-      if (!res.ok) throw new Error('Error loading report files');
-      return res.json();
+      if (category === 'teachers') return teachersService.getAll().then((r) => r.data);
+      if (category === 'donations') return donationsService.getAll().then((r) => r.data);
+      if (category === 'gps') return gpsService.getAll().then((r) => r.data);
+      return studentsService.getAll().then((r) => r.data); // default: students
     },
   });
 

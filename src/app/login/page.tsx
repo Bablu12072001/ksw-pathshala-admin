@@ -2,57 +2,23 @@
 
 import React, { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { Shield, KeyRound, Smartphone, HelpCircle } from 'lucide-react';
+import { Shield, KeyRound, AlertTriangle } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-
-// ─── Demo Accounts (no API — client-side only) ───────────────────────────────
-const DEMO_USERS = [
-  {
-    id: 'user-001',
-    username: 'admin',
-    password: 'adminpassword',
-    name: 'Rajesh Kumar',
-    role: 'Admin' as const,
-    phone: '+919876543210',
-  },
-  {
-    id: 'user-002',
-    username: 'coordinator',
-    password: 'coordpassword',
-    name: 'Priya Sharma',
-    role: 'Coordinator' as const,
-    phone: '+918765432109',
-  },
-  {
-    id: 'user-003',
-    username: 'sponsor',
-    password: 'sponsorpassword',
-    name: 'Amit Patel',
-    role: 'Sponsor' as const,
-    phone: '+917654321098',
-  },
-];
+import { authService } from '@/services';
+import axios from 'axios';
 
 export default function LoginPage() {
   const router = useRouter();
   const { user, login } = useAppStore();
 
   // Form states
-  const [authMode, setAuthMode] = useState<'password' | 'otp'>('password');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  const [phone, setPhone] = useState('');
-  const [otpCode, setOtpCode] = useState('');
-
-  // Pipeline flow states
-  const [otpSent, setOtpSent] = useState(false);
-  const [receivedDemoOtp, setReceivedDemoOtp] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [showDemoAccounts, setShowDemoAccounts] = useState(false);
 
   // Redirect if already logged in
   useEffect(() => {
@@ -61,7 +27,7 @@ export default function LoginPage() {
     }
   }, [user, router]);
 
-  // ── Password login (client-side, no API) ────────────────────────────────────
+  // ── Password login via real API ──────────────────────────────────────────────
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!username || !password) {
@@ -72,116 +38,45 @@ export default function LoginPage() {
     setLoading(true);
     setError('');
 
-    // Simulate a tiny delay for realistic UX
-    await new Promise((r) => setTimeout(r, 600));
+    try {
+      const { data } = await authService.login({ username, password });
 
-    const found = DEMO_USERS.find(
-      (u) =>
-        u.username.toLowerCase() === username.toLowerCase() &&
-        u.password === password
-    );
+      let decodedRole = 'Admin';
+      let decodedName = username;
 
-    if (!found) {
-      setError('Invalid username or password');
+      try {
+        if (data.token && data.token.includes('.')) {
+          const payloadBase64Url = data.token.split('.')[1];
+          const payloadBase64 = payloadBase64Url.replace(/-/g, '+').replace(/_/g, '/');
+          const decoded = JSON.parse(window.atob(payloadBase64));
+          if (decoded.role) decodedRole = decoded.role;
+          if (decoded.username || decoded.name) decodedName = decoded.username || decoded.name;
+        }
+      } catch (e) {
+        console.error('Could not decode token for role', e);
+      }
+
+      const session = {
+        id: data.user?.id ?? `u-${Date.now()}`,
+        username,
+        name: data.user?.name ?? decodedName,
+        role: (data.user?.role ?? decodedRole) as 'Admin' | 'Coordinator' | 'Sponsor',
+        phone: data.user?.phone ?? '',
+        token: data.token,
+      };
+
+      login(session);
+      router.push('/dashboard');
+    } catch (apiErr) {
+      const message =
+        axios.isAxiosError(apiErr) && apiErr.response?.data?.error
+          ? apiErr.response.data.error
+          : axios.isAxiosError(apiErr) && apiErr.response?.data?.message
+            ? apiErr.response.data.message
+            : 'Invalid username or password';
+      setError(message);
+    } finally {
       setLoading(false);
-      return;
-    }
-
-    login({
-      id: found.id,
-      username: found.username,
-      name: found.name,
-      role: found.role,
-      phone: found.phone,
-      token: `demo-token-${found.id}`,
-    });
-    router.push('/dashboard');
-    setLoading(false);
-  };
-
-  // ── Send OTP (client-side, no API) ──────────────────────────────────────────
-  const handleSendOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!phone) {
-      setError('Please enter your registered phone number');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-    setReceivedDemoOtp(null);
-
-    await new Promise((r) => setTimeout(r, 700));
-
-    const found = DEMO_USERS.find((u) => u.phone === phone);
-    if (!found) {
-      setError('Phone number not registered in demo accounts');
-      setLoading(false);
-      return;
-    }
-
-    // Generate a demo 6-digit OTP client-side
-    const generatedOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    setReceivedDemoOtp(generatedOtp);
-    setOtpSent(true);
-    setLoading(false);
-  };
-
-  // ── Verify OTP (client-side, no API) ────────────────────────────────────────
-  const handleVerifyOtp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!otpCode) {
-      setError('Please enter the verification code');
-      return;
-    }
-
-    if (receivedDemoOtp && otpCode !== receivedDemoOtp) {
-      setError('Invalid OTP code. Please check and try again.');
-      return;
-    }
-
-    setLoading(true);
-    setError('');
-
-    await new Promise((r) => setTimeout(r, 600));
-
-    const found = DEMO_USERS.find((u) => u.phone === phone);
-    if (!found) {
-      setError('Phone number not registered');
-      setLoading(false);
-      return;
-    }
-
-    login({
-      id: found.id,
-      username: found.username,
-      name: found.name,
-      role: found.role,
-      phone: found.phone,
-      token: `demo-otp-token-${found.id}`,
-    });
-    router.push('/dashboard');
-    setLoading(false);
-  };
-
-  // ── Quick fill helper for demo ease ─────────────────────────────────────────
-  const fillDemoCreds = (role: 'admin' | 'coordinator' | 'sponsor') => {
-    setError('');
-    setOtpSent(false);
-    setReceivedDemoOtp(null);
-
-    if (role === 'admin') {
-      setUsername('admin');
-      setPassword('adminpassword');
-      setPhone('+919876543210');
-    } else if (role === 'coordinator') {
-      setUsername('coordinator');
-      setPassword('coordpassword');
-      setPhone('+918765432109');
-    } else {
-      setUsername('sponsor');
-      setPassword('sponsorpassword');
-      setPhone('+917654321098');
     }
   };
 
@@ -194,170 +89,55 @@ export default function LoginPage() {
       {/* Main card */}
       <Card className="w-full max-w-md shadow-2xl glass-panel relative z-10 border-border/75">
         <CardHeader className="text-center pb-2">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-primary">
-            <Shield className="h-6 w-6" />
+          <div className="mx-auto mb-3 flex h-24 w-24 items-center justify-center rounded-full bg-white text-primary overflow-hidden shadow-lg p-2">
+            <img src="/logo.jpg" alt="KSW Pathshala Logo" className="w-full h-full object-contain" />
           </div>
           <CardTitle className="text-2xl font-bold tracking-tight">KSW Pathshala</CardTitle>
           <CardDescription>Enterprise NGO Administration System</CardDescription>
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* Double Mode Toggle tabs */}
-          <div className="grid grid-cols-2 gap-2 p-1 bg-secondary/35 rounded-lg border border-border/40">
-            <button
-              onClick={() => {
-                setAuthMode('password');
-                setError('');
-                setOtpSent(false);
-              }}
-              className={`flex items-center justify-center py-2 text-xs font-semibold rounded-md transition-all cursor-pointer ${
-                authMode === 'password'
-                  ? 'bg-card text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <KeyRound className="mr-1.5 h-3.5 w-3.5" />
-              Password
-            </button>
-            <button
-              onClick={() => {
-                setAuthMode('otp');
-                setError('');
-                setOtpSent(false);
-              }}
-              className={`flex items-center justify-center py-2 text-xs font-semibold rounded-md transition-all cursor-pointer ${
-                authMode === 'otp'
-                  ? 'bg-card text-foreground shadow-sm'
-                  : 'text-muted-foreground hover:text-foreground'
-              }`}
-            >
-              <Smartphone className="mr-1.5 h-3.5 w-3.5" />
-              WhatsApp OTP
-            </button>
+          {/* Auth Mode label */}
+          <div className="flex items-center justify-center gap-2 text-xs font-semibold text-muted-foreground py-1">
+            <KeyRound className="h-3.5 w-3.5" />
+            Admin Password Login
           </div>
 
+          {/* Error banner */}
           {error && (
-            <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive font-medium">
-              {error}
+            <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3 text-xs text-destructive font-medium flex items-start gap-2">
+              <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" />
+              <span>{error}</span>
             </div>
           )}
 
-          {/* PASSWORD METHOD */}
-          {authMode === 'password' && (
-            <form onSubmit={handlePasswordSubmit} className="space-y-4">
-              <Input
-                label="Username"
-                type="text"
-                placeholder="Enter admin/coordinator username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-              />
-              <Input
-                label="Password"
-                type="password"
-                placeholder="••••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-              <Button type="submit" className="w-full h-10 mt-2 font-bold" isLoading={loading}>
-                Sign In
-              </Button>
-            </form>
-          )}
-
-          {/* OTP METHOD */}
-          {authMode === 'otp' && (
-            <div className="space-y-4">
-              {!otpSent ? (
-                <form onSubmit={handleSendOtp} className="space-y-4">
-                  <Input
-                    label="Registered Phone Number"
-                    type="tel"
-                    placeholder="e.g. +919876543210"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                  />
-                  <Button type="submit" className="w-full h-10 mt-2 font-bold" isLoading={loading}>
-                    Generate Verification OTP
-                  </Button>
-                </form>
-              ) : (
-                <form onSubmit={handleVerifyOtp} className="space-y-4">
-                  {/* Simulated OTP Display Banner */}
-                  {receivedDemoOtp && (
-                    <div className="rounded-lg bg-emerald-500/10 border border-emerald-500/20 p-3 text-xs text-emerald-600 dark:text-emerald-400 font-medium">
-                      <p className="font-bold">Simulated WhatsApp SMS Code Sent!</p>
-                      <p className="mt-1">
-                        Use OTP:{' '}
-                        <span className="font-mono bg-emerald-500/20 px-2 py-0.5 rounded text-sm font-bold tracking-widest">
-                          {receivedDemoOtp}
-                        </span>
-                      </p>
-                    </div>
-                  )}
-
-                  <Input
-                    label={`Verify Code sent to ${phone}`}
-                    type="text"
-                    maxLength={6}
-                    placeholder="Enter 6-digit OTP code"
-                    value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value)}
-                    className="text-center font-mono tracking-widest text-lg"
-                  />
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => setOtpSent(false)}
-                      className="w-1/3 h-10 text-xs font-semibold"
-                    >
-                      Back
-                    </Button>
-                    <Button type="submit" className="w-2/3 h-10 font-bold" isLoading={loading}>
-                      Verify &amp; Access
-                    </Button>
-                  </div>
-                </form>
-              )}
-            </div>
-          )}
-
-          {/* Quick Helper Trigger */}
-          <div className="pt-2 border-t border-border/40 mt-6">
-            <button
-              onClick={() => setShowDemoAccounts(!showDemoAccounts)}
-              className="w-full flex items-center justify-center text-xs font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
-            >
-              <HelpCircle className="mr-1.5 h-4 w-4" />
-              {showDemoAccounts ? 'Hide Quick Demonstration Help' : 'Show Quick Demonstration Help'}
-            </button>
-
-            {showDemoAccounts && (
-              <div className="mt-3 grid grid-cols-3 gap-2 p-2.5 bg-secondary/25 border border-border/40 rounded-lg animate-in fade-in-50 duration-150">
-                <button
-                  onClick={() => fillDemoCreds('admin')}
-                  className="px-2 py-1.5 text-xxs font-bold bg-primary/10 text-primary hover:bg-primary/20 rounded border border-primary/20 cursor-pointer"
-                >
-                  Admin Creds
-                </button>
-                <button
-                  onClick={() => fillDemoCreds('coordinator')}
-                  className="px-2 py-1.5 text-xxs font-bold bg-primary/10 text-primary hover:bg-primary/20 rounded border border-primary/20 cursor-pointer"
-                >
-                  Coord Creds
-                </button>
-                <button
-                  onClick={() => fillDemoCreds('sponsor')}
-                  className="px-2 py-1.5 text-xxs font-bold bg-primary/10 text-primary hover:bg-primary/20 rounded border border-primary/20 cursor-pointer"
-                >
-                  Sponsor Creds
-                </button>
-              </div>
-            )}
-          </div>
+          {/* Login form */}
+          <form onSubmit={handlePasswordSubmit} className="space-y-4">
+            <Input
+              label="Username"
+              id="login-username"
+              type="text"
+              autoComplete="username"
+              placeholder="Enter your username"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+            />
+            <Input
+              label="Password"
+              id="login-password"
+              type="password"
+              autoComplete="current-password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <Button type="submit" className="w-full h-10 mt-2 font-bold" isLoading={loading}>
+              Sign In
+            </Button>
+          </form>
         </CardContent>
       </Card>
+
       <div className="mt-6 text-center text-xxs text-muted-foreground">
         © 2026 KSW Pathshala Foundation. Secure access only.
       </div>

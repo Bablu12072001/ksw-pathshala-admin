@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Image as ImageIcon, Video, Plus, Calendar, Film } from 'lucide-react';
+import { Plus, Calendar, Edit2, Trash2 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Dialog } from '@/components/ui/dialog';
 import { useAppStore } from '@/lib/store';
+import { activitiesService } from '@/services';
 
 export default function ActivitiesPage() {
   const queryClient = useQueryClient();
@@ -19,58 +20,27 @@ export default function ActivitiesPage() {
 
   // Modal controller
   const [isAddOpen, setIsAddOpen] = useState(false);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editActivityId, setEditActivityId] = useState<string | null>(null);
+  
   const [formData, setFormData] = useState({
     title: '',
     description: '',
-    type: 'Photo',
-    mediaUrl: '',
     class: 'Class 5',
+    author: user?.name || '',
+    isSuccessStory: false,
   });
 
-  // Predefined high-quality illustrations for quick selection during testing
-  const stockAssets = [
-    {
-      label: 'Drawing & Painting (Photo)',
-      url: 'https://images.unsplash.com/photo-1503676260728-1c00da094a0b?auto=format&fit=crop&w=600&q=80',
-    },
-    {
-      label: 'English Vocabulary Board (Photo)',
-      url: 'https://images.unsplash.com/photo-1577896851231-70ef18881754?auto=format&fit=crop&w=600&q=80',
-    },
-    {
-      label: 'Science Project Group (Photo)',
-      url: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=600&q=80',
-    },
-    {
-      label: 'Classroom Arithmetic Video (Video MP4)',
-      url: 'https://assets.mixkit.co/videos/preview/mixkit-children-in-class-studying-with-books-and-pencils-34324-large.mp4',
-    },
-  ];
-
-  // 1. Fetch activities
+  // 1. Fetch activities via Axios admin API
   const { data: activitiesData, isLoading } = useQuery({
     queryKey: ['activities'],
-    queryFn: async () => {
-      const res = await fetch('/api/activities');
-      if (!res.ok) throw new Error('Error fetching activities');
-      return res.json();
-    },
+    queryFn: () => activitiesService.getAll().then((r) => r.data),
   });
 
-  // Mutation
+  // Mutation via Axios admin API
   const createMutation = useMutation({
-    mutationFn: async (newActivity: any) => {
-      const payload = {
-        ...newActivity,
-        teacherName: user?.name || 'Coordinator',
-      };
-      const res = await fetch('/api/activities', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      });
-      if (!res.ok) throw new Error('Failed to post activity');
-      return res.json();
+    mutationFn: (newActivity: any) => {
+      return activitiesService.create(newActivity).then((r) => r.data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['activities'] });
@@ -80,28 +50,62 @@ export default function ActivitiesPage() {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: ({ id, payload }: { id: string; payload: any }) => {
+      return activitiesService.update(id, payload).then((r) => r.data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
+      setIsEditOpen(false);
+      resetForm();
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (id: string) => activitiesService.delete(id).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['activities'] });
+    },
+  });
+
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type } = e.target;
+    if (type === 'checkbox') {
+      setFormData((prev) => ({ ...prev, [name]: (e.target as HTMLInputElement).checked }));
+    } else {
+      setFormData((prev) => ({ ...prev, [name]: value }));
+    }
   };
-
-  const handleStockSelect = (url: string, type: string) => {
-    setFormData((prev) => ({ ...prev, mediaUrl: url, type }));
-  };
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    createMutation.mutate(formData);
+    if (isEditOpen && editActivityId) {
+      updateMutation.mutate({ id: editActivityId, payload: { title: formData.title, description: formData.description, class: formData.class, author: formData.author, isSuccessStory: formData.isSuccessStory } });
+    } else {
+      createMutation.mutate(formData);
+    }
   };
 
   const resetForm = () => {
     setFormData({
       title: '',
       description: '',
-      type: 'Photo',
-      mediaUrl: '',
       class: 'Class 5',
+      author: user?.name || '',
+      isSuccessStory: false,
     });
+    setEditActivityId(null);
+  };
+
+  const openEdit = (act: any) => {
+    setFormData({
+      title: act.title || '',
+      description: act.description || '',
+      class: act.class || 'Class 5',
+      author: act.author || act.teacherName || '',
+      isSuccessStory: act.isSuccessStory || false,
+    });
+    setEditActivityId(act.id);
+    setIsEditOpen(true);
   };
 
   return (
@@ -128,37 +132,32 @@ export default function ActivitiesPage() {
           <div className="flex h-60 items-center justify-center">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
           </div>
-        ) : !activitiesData?.activities || activitiesData.activities.length === 0 ? (
-          <div className="text-center py-16 text-xs text-muted-foreground">
-            No activities uploaded. Add a classroom update to view media posts.
-          </div>
-        ) : (
-          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {activitiesData.activities.map((act: any) => (
-              <Card key={act.id} className="overflow-hidden flex flex-col h-full border-border/70 hover:translate-y-[-2px] transition-all duration-300">
-                {/* Media frame */}
-                <div className="relative h-48 w-full bg-slate-950/20 flex items-center justify-center overflow-hidden border-b border-border/40">
-                  {act.type === 'Video' ? (
-                    <video
-                      src={act.mediaUrl}
-                      controls
-                      poster="https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=600&q=80"
-                      className="h-full w-full object-cover"
-                    />
-                  ) : (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={act.mediaUrl} alt={act.title} className="h-full w-full object-cover" />
+        ) : (() => {
+          const activitiesList = Array.isArray(activitiesData) ? activitiesData : (activitiesData?.activities || []);
+          if (!activitiesList || activitiesList.length === 0) {
+            return (
+              <div className="text-center py-16 text-xs text-muted-foreground">
+                No activities uploaded. Add a classroom update to view media posts.
+              </div>
+            );
+          }
+          return (
+            <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+              {activitiesList.map((act: any) => (
+                <Card key={act.id} className="overflow-hidden flex flex-col h-full border-border/70 hover:translate-y-[-2px] transition-all duration-300 relative">
+                  {!isSponsor && (
+                    <div className="absolute top-3 right-3 flex space-x-2 z-10">
+                      <button onClick={() => openEdit(act)} className="h-7 w-7 rounded-full bg-secondary/80 hover:bg-secondary border border-border/40 flex items-center justify-center text-foreground transition-colors shadow-sm cursor-pointer">
+                        <Edit2 className="h-3.5 w-3.5" />
+                      </button>
+                      <button onClick={() => { if(confirm('Delete activity?')) deleteMutation.mutate(act.id); }} className="h-7 w-7 rounded-full bg-destructive/10 hover:bg-destructive/20 border border-destructive/20 flex items-center justify-center text-destructive transition-colors shadow-sm cursor-pointer">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
                   )}
-                  <div className="absolute top-2.5 left-2.5">
-                    <Badge variant={act.type === 'Video' ? 'destructive' : 'info'} className="flex items-center space-x-1 py-0.5 shadow-md">
-                      {act.type === 'Video' ? <Video className="h-3 w-3" /> : <ImageIcon className="h-3 w-3" />}
-                      <span className="text-xxxxs uppercase tracking-wider font-extrabold">{act.type}</span>
-                    </Badge>
-                  </div>
-                </div>
 
                 {/* Content */}
-                <CardContent className="p-4 flex-1 flex flex-col justify-between">
+                <CardContent className="p-5 flex-1 flex flex-col justify-between pt-8">
                   <div className="space-y-1.5">
                     <div className="flex justify-between items-center">
                       <Badge variant="outline" className="font-semibold text-xxs bg-secondary/35">
@@ -166,9 +165,14 @@ export default function ActivitiesPage() {
                       </Badge>
                       <div className="flex items-center text-xxs text-muted-foreground">
                         <Calendar className="mr-1 h-3 w-3" />
-                        <span>{act.date}</span>
+                        <span>{new Date(act.created_at).toLocaleDateString()}</span>
                       </div>
                     </div>
+                    {act.mediaUrl && (
+                      <div className="mt-2 w-full h-32 rounded-md overflow-hidden bg-secondary">
+                        <img src={act.mediaUrl} alt={act.title} className="w-full h-full object-cover" />
+                      </div>
+                    )}
                     <h3 className="text-sm font-bold text-foreground leading-snug">{act.title}</h3>
                     <p className="text-xxs leading-relaxed text-muted-foreground/95">
                       {act.description}
@@ -177,16 +181,20 @@ export default function ActivitiesPage() {
 
                   {/* Signature */}
                   <div className="mt-4 pt-3 border-t border-border/40 text-xxxxs font-bold text-muted-foreground uppercase tracking-wide flex justify-between items-center">
-                    <span>Uploaded By: {act.teacherName}</span>
+                    <span>Uploaded By: {act.author || act.teacherName || 'Admin'}</span>
+                    {act.isSuccessStory && (
+                      <span className="text-emerald-500">Success Story</span>
+                    )}
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        )}
+              ))}
+            </div>
+          );
+        })()}
 
-        {/* DIALOG: UPLOAD UPDATE */}
-        <Dialog isOpen={isAddOpen} onClose={() => setIsAddOpen(false)} title="Upload Classroom Post">
+        {/* DIALOG: UPLOAD / EDIT UPDATE */}
+        <Dialog isOpen={isAddOpen || isEditOpen} onClose={() => { setIsAddOpen(false); setIsEditOpen(false); resetForm(); }} title={isEditOpen ? "Edit Classroom Post" : "Upload Classroom Post"}>
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
               label="Activity Title *"
@@ -224,51 +232,32 @@ export default function ActivitiesPage() {
                 value={formData.class}
                 onChange={handleFormChange}
               />
-              <Select
-                label="Media Asset Type *"
-                name="type"
-                options={[
-                  { label: 'Photo Frame', value: 'Photo' },
-                  { label: 'Video Stream', value: 'Video' },
-                ]}
-                value={formData.type}
+              <Input
+                label="Author Name *"
+                name="author"
+                required
+                placeholder="e.g. Rajesh Kumar"
+                value={formData.author}
                 onChange={handleFormChange}
               />
             </div>
-
-            <Input
-              label="Media URL *"
-              name="mediaUrl"
-              placeholder="Provide image or mp4 video link"
-              value={formData.mediaUrl}
-              onChange={handleFormChange}
-            />
-
-            {/* Quick-select Assets Help panel */}
-            <div className="p-3 bg-secondary/25 border border-border/40 rounded-lg space-y-2">
-              <span className="text-xxs font-bold uppercase tracking-wider text-muted-foreground flex items-center">
-                <Film className="mr-1.5 h-3.5 w-3.5" />
-                Demonstration Stock Assets (Click to autofill URL)
-              </span>
-              <div className="grid grid-cols-2 gap-2 text-left">
-                {stockAssets.map((asset) => {
-                  const type = asset.label.includes('Video') ? 'Video' : 'Photo';
-                  return (
-                    <button
-                      key={asset.label}
-                      type="button"
-                      onClick={() => handleStockSelect(asset.url, type)}
-                      className="p-1.5 text-xxxs font-semibold bg-primary/5 border border-primary/15 text-primary hover:bg-primary/15 rounded text-left truncate cursor-pointer"
-                    >
-                      {asset.label}
-                    </button>
-                  );
-                })}
-              </div>
+            
+            <div className="flex items-center space-x-2 pb-2">
+              <input
+                type="checkbox"
+                name="isSuccessStory"
+                id="isSuccessStory"
+                checked={formData.isSuccessStory}
+                onChange={handleFormChange}
+                className="h-4 w-4 rounded border-border text-primary focus:ring-primary"
+              />
+              <label htmlFor="isSuccessStory" className="text-xs font-semibold text-muted-foreground">
+                Mark as Success Story
+              </label>
             </div>
 
-            <Button type="submit" className="w-full h-10 font-bold" isLoading={createMutation.isPending}>
-              Publish Milestone Post
+            <Button type="submit" className="w-full h-10 font-bold" isLoading={createMutation.isPending || updateMutation.isPending}>
+              {isEditOpen ? "Save Changes" : "Publish Milestone Post"}
             </Button>
           </form>
         </Dialog>

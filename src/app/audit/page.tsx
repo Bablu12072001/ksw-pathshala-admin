@@ -8,7 +8,9 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
+import { Pagination } from '@/components/ui/pagination';
 import { useAppStore } from '@/lib/store';
+import { dashboardService } from '@/services';
 
 export default function AuditPage() {
   const queryClient = useQueryClient();
@@ -16,25 +18,18 @@ export default function AuditPage() {
   const isAdmin = user?.role === 'Admin';
   
   const [backupLog, setBackupLog] = useState<string | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
 
-  // 1. Fetch Audit Logs
+  // 1. Fetch Audit Logs via Axios admin API
   const { data: auditData, isLoading } = useQuery({
     queryKey: ['auditLogs'],
-    queryFn: async () => {
-      const res = await fetch('/api/audit');
-      if (!res.ok) throw new Error('Error loading audit reports');
-      return res.json();
-    },
+    queryFn: () => dashboardService.getAuditLogs().then((r) => r.data),
     enabled: isAdmin,
   });
 
-  // Backup Mutation
+  // Backup Mutation via Axios admin API
   const backupMutation = useMutation({
-    mutationFn: async () => {
-      const res = await fetch('/api/audit', { method: 'POST' });
-      if (!res.ok) throw new Error('Failed to run backup snapshot');
-      return res.json();
-    },
+    mutationFn: () => dashboardService.triggerBackup().then((r) => r.data),
     onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['auditLogs'] });
       setBackupLog(data.backupFile);
@@ -128,7 +123,9 @@ export default function AuditPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {auditData.logs.map((log: any) => (
+                  {(() => {
+                    const paginatedLogs = auditData.logs.slice((currentPage - 1) * 10, currentPage * 10);
+                    return paginatedLogs.map((log: any) => (
                     <TableRow key={log.id}>
                       <TableCell className="py-3 font-semibold text-xs text-foreground flex items-center space-x-1.5">
                         <Terminal className="h-3.5 w-3.5 text-muted-foreground" />
@@ -160,9 +157,17 @@ export default function AuditPage() {
                         {new Date(log.timestamp).toLocaleString()}
                       </TableCell>
                     </TableRow>
-                  ))}
+                    ));
+                  })()}
                 </TableBody>
               </Table>
+            )}
+            {!isLoading && auditData?.logs && (
+              <Pagination
+                currentPage={currentPage}
+                totalItems={auditData.logs.length}
+                onPageChange={setCurrentPage}
+              />
             )}
           </CardContent>
         </Card>

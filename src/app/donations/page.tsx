@@ -11,7 +11,9 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Dialog } from '@/components/ui/dialog';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
+import { Pagination } from '@/components/ui/pagination';
 import { useAppStore } from '@/lib/store';
+import { donationsService, studentsService } from '@/services';
 
 export default function DonationsPage() {
   const queryClient = useQueryClient();
@@ -21,6 +23,7 @@ export default function DonationsPage() {
   // Search/Filter states
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Dialog controllers
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -34,42 +37,23 @@ export default function DonationsPage() {
     paymentMethod: 'UPI',
   });
 
-  // 1. Fetch Donations
+  // 1. Fetch Donations via Axios admin API
   const { data: donationsData, isLoading: loadingDonations } = useQuery({
     queryKey: ['donations', searchTerm, statusFilter],
-    queryFn: async () => {
-      const query = new URLSearchParams({
-        search: searchTerm,
-        status: statusFilter,
-      }).toString();
-      const res = await fetch(`/api/donations?${query}`);
-      if (!res.ok) throw new Error('Error fetching donations');
-      return res.json();
-    },
+    queryFn: () =>
+      donationsService.getAll({ search: searchTerm, status: statusFilter }).then((r) => r.data),
   });
 
   // 2. Fetch approved students for sponsorship selection dropdown
   const { data: studentsData } = useQuery({
     queryKey: ['approvedStudentsForSponsorship'],
-    queryFn: async () => {
-      const res = await fetch('/api/students?status=Approved');
-      if (!res.ok) throw new Error('Error fetching students');
-      return res.json();
-    },
+    queryFn: () => studentsService.getAll({ status: 'Approved' }).then((r) => r.data),
     enabled: formData.type === 'Sponsorship',
   });
 
   // Mutations
   const createMutation = useMutation({
-    mutationFn: async (newDonation: any) => {
-      const res = await fetch('/api/donations', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newDonation),
-      });
-      if (!res.ok) throw new Error('Create request failed');
-      return res.json();
-    },
+    mutationFn: (newDonation: any) => donationsService.create(newDonation).then((r) => r.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['donations'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
@@ -79,15 +63,8 @@ export default function DonationsPage() {
   });
 
   const verifyMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const res = await fetch(`/api/donations?id=${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'Verified' }),
-      });
-      if (!res.ok) throw new Error('Verification request failed');
-      return res.json();
-    },
+    mutationFn: (id: string) =>
+      donationsService.update(id, { status: 'Verified' }).then((r) => r.data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['donations'] });
       queryClient.invalidateQueries({ queryKey: ['dashboardStats'] });
@@ -247,7 +224,9 @@ export default function DonationsPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {list.map((donation: any) => (
+                  {(() => {
+                    const paginatedList = list.slice((currentPage - 1) * 10, currentPage * 10);
+                    return paginatedList.map((donation: any) => (
                     <TableRow key={donation.id}>
                       <TableCell className="py-3.5 font-bold text-xs text-foreground">
                         {donation.donorName}
@@ -300,9 +279,17 @@ export default function DonationsPage() {
                         </TableCell>
                       )}
                     </TableRow>
-                  ))}
+                    ));
+                  })()}
                 </TableBody>
               </Table>
+            )}
+            {!loadingDonations && list.length > 0 && (
+              <Pagination
+                currentPage={currentPage}
+                totalItems={list.length}
+                onPageChange={setCurrentPage}
+              />
             )}
           </CardContent>
         </Card>

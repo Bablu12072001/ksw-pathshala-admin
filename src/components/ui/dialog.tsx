@@ -50,7 +50,7 @@ export function Dialog({ isOpen, onClose, title, children, className }: DialogPr
       {/* Dialog Body */}
       <div
         className={cn(
-          'relative w-full max-w-lg rounded-xl border border-border bg-card p-6 shadow-2xl glass-panel animate-in fade-in-50 zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto z-10',
+          'relative w-full max-w-3xl rounded-xl border border-border bg-card p-6 shadow-2xl glass-panel animate-in fade-in-50 zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto z-10',
           className
         )}
       >

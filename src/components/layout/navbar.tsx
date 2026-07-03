@@ -6,6 +6,7 @@ import { Bell, Sun, Moon, CheckCheck } from 'lucide-react';
 import { useAppStore, SystemNotification } from '@/lib/store';
 import { Button } from '../ui/button';
 import { cn } from '@/lib/utils';
+import { dashboardService } from '@/services';
 
 export function Navbar() {
   const pathname = usePathname();
@@ -16,10 +17,10 @@ export function Navbar() {
   useEffect(() => {
     async function fetchNotifications() {
       try {
-        const res = await fetch('/api/notifications');
-        if (res.ok) {
-          const data = await res.json();
-          setNotifications(data.notifications);
+        const res = await dashboardService.getNotifications();
+        if (res.data) {
+          const parsed = Array.isArray(res.data) ? res.data : (res.data?.notifications || []);
+          setNotifications(Array.isArray(parsed) ? parsed : []);
         }
       } catch (err) {
         console.error('Failed to fetch notifications', err);
@@ -51,7 +52,7 @@ export function Navbar() {
   const handleMarkAsRead = async (id: string) => {
     markAsRead(id);
     try {
-      await fetch(`/api/notifications?id=${id}`, { method: 'PATCH' });
+      await dashboardService.markNotificationRead(id);
     } catch (err) {
       console.error('Error marking notification as read:', err);
     }
@@ -60,7 +61,7 @@ export function Navbar() {
   const handleMarkAllAsRead = async () => {
     markAllAsRead();
     try {
-      await fetch('/api/notifications', { method: 'PATCH' });
+      await dashboardService.markAllNotificationsRead();
     } catch (err) {
       console.error('Error marking all notifications as read:', err);
     }
