@@ -254,7 +254,6 @@ export default function EventsPage() {
           isOpen={isRegistrationsModalOpen} 
           onClose={() => setIsRegistrationsModalOpen(false)} 
           title="Event Registrations"
-          maxWidth="max-w-3xl"
         >
           {selectedEvent && (
             <div className="space-y-4">

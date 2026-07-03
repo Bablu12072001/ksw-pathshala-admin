@@ -377,7 +377,7 @@ export default function Dashboard() {
                             </TableCell>
                             <TableCell className="py-3 font-semibold text-xs">{volunteer.fullName || volunteer.name}</TableCell>
                             <TableCell className="py-3">
-                              <Badge variant="secondary">Volunteer</Badge>
+                              <Badge variant="outline">Volunteer</Badge>
                             </TableCell>
                             <TableCell className="py-3 text-xxs text-muted-foreground">
                               {new Date(volunteer.created_at || volunteer.joiningDate).toLocaleDateString()}
