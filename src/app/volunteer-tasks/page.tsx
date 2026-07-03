@@ -68,7 +68,7 @@ export default function VolunteerTasksPage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['volunteerTasks'] });
       setIsTaskModalOpen(false);
-      setTaskForm({ volunteerId: 'all', title: '', description: '', points: 0, dueDate: '' });
+      setTaskForm({ volunteerId: 'all', title: '', description: '', points: '' });
     },
   });
 
