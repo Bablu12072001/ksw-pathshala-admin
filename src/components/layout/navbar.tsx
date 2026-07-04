@@ -19,7 +19,7 @@ export function Navbar() {
       try {
         const res = await dashboardService.getNotifications();
         if (res.data) {
-          const parsed = Array.isArray(res.data) ? res.data : (res.data?.notifications || []);
+          const parsed = Array.isArray(res.data) ? res.data : (res.data?.items || res.data?.notifications || []);
           setNotifications(Array.isArray(parsed) ? parsed : []);
         }
       } catch (err) {

@@ -25,12 +25,10 @@ function RecenterMap({ center, zoom }: { center: [number, number]; zoom: number 
 interface MapComponentProps {
   targetLat: number;
   targetLng: number;
-  mockLat?: number;
-  mockLng?: number;
   radius?: number; // Geofence radius in meters, default 100
 }
 
-export default function MapComponent({ targetLat, targetLng, mockLat, mockLng, radius = 100 }: MapComponentProps) {
+export default function MapComponent({ targetLat, targetLng, radius = 100 }: MapComponentProps) {
   const center: [number, number] = [targetLat, targetLng];
 
   return (
@@ -60,17 +58,6 @@ export default function MapComponent({ targetLat, targetLng, mockLat, mockLng, r
           <Popup>Classroom Target Geofence Center (Radius: {radius}m)</Popup>
         </Circle>
 
-        {/* Current Simulated Position Marker */}
-        {mockLat !== undefined && mockLng !== undefined && (
-          <Marker position={[mockLat, mockLng]}>
-            <Popup>
-              <div className="font-semibold text-xs">Simulated Clock-in Location</div>
-              <div className="text-muted-foreground text-xxs">
-                {mockLat.toFixed(5)}, {mockLng.toFixed(5)}
-              </div>
-            </Popup>
-          </Marker>
-        )}
 
         <RecenterMap center={center} zoom={16} />
       </MapContainer>

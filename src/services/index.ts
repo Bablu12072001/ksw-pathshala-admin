@@ -212,9 +212,10 @@ export const introVideosService = {
 // 7. Founder Message
 // ─────────────────────────────────────────────────────────────────────────────
 export const founderService = {
-  get: () => apiClient.get('/api/admin/founder'),
-  update: (payload: FounderUpdatePayload) =>
-    apiClient.put('/api/admin/founder', payload),
+  get: () => apiClient.get('/api/founder'),
+  create: (payload: any) => apiClient.post('/api/admin/founder', payload),
+  update: (payload: any) => apiClient.put('/api/admin/founder', payload),
+  delete: () => apiClient.delete('/api/admin/founder'),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -232,34 +233,40 @@ export const membersService = {
 // 9. Trust Credentials Manager
 // ─────────────────────────────────────────────────────────────────────────────
 export const credentialsService = {
-  getAll: () => apiClient.get('/api/admin/credentials'),
-  create: (payload: CredentialPayload) =>
-    apiClient.post('/api/admin/credentials', payload),
+  getAll: () => apiClient.get('/api/credentials'),
+  create: (payload: any) => apiClient.post('/api/admin/credentials', payload),
+  update: (id: string, payload: any) => apiClient.put(`/api/admin/credentials/${id}`, payload),
+  delete: (id: string) => apiClient.delete(`/api/admin/credentials/${id}`),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 10. Sponsor Reviews Manager
 // ─────────────────────────────────────────────────────────────────────────────
 export const reviewsService = {
-  getAll: () => apiClient.get('/api/admin/reviews'),
-  create: (payload: ReviewPayload) => apiClient.post('/api/admin/reviews', payload),
+  getAll: () => apiClient.get('/api/reviews'),
+  create: (payload: any) => apiClient.post('/api/admin/reviews', payload),
+  update: (id: string, payload: any) => apiClient.put(`/api/admin/reviews/${id}`, payload),
+  delete: (id: string) => apiClient.delete(`/api/admin/reviews/${id}`),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 11. Sponsors & Partners Manager
 // ─────────────────────────────────────────────────────────────────────────────
 export const partnersService = {
-  getAll: () => apiClient.get('/api/admin/partners'),
-  create: (payload: PartnerPayload) =>
-    apiClient.post('/api/admin/partners', payload),
+  getAll: () => apiClient.get('/api/partners'),
+  create: (payload: any) => apiClient.post('/api/admin/partners', payload),
+  update: (id: string, payload: any) => apiClient.put(`/api/admin/partners/${id}`, payload),
+  delete: (id: string) => apiClient.delete(`/api/admin/partners/${id}`),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
 // 12. FAQs Manager
 // ─────────────────────────────────────────────────────────────────────────────
 export const faqsService = {
-  getAll: () => apiClient.get('/api/admin/faqs'),
-  create: (payload: FAQPayload) => apiClient.post('/api/admin/faqs', payload),
+  getAll: () => apiClient.get('/api/faqs'),
+  create: (payload: any) => apiClient.post('/api/admin/faqs', payload),
+  update: (id: string, payload: any) => apiClient.put(`/api/admin/faqs/${id}`, payload),
+  delete: (id: string) => apiClient.delete(`/api/admin/faqs/${id}`),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -267,6 +274,7 @@ export const faqsService = {
 // ─────────────────────────────────────────────────────────────────────────────
 export const subscribersService = {
   getAll: () => apiClient.get('/api/admin/subscribers'),
+  delete: (id: string) => apiClient.delete(`/api/admin/subscribers/${id}`),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -324,6 +332,9 @@ export const teachersService = {
 // ─────────────────────────────────────────────────────────────────────────────
 export const campaignsService = {
   getAll: () => apiClient.get('/api/admin/campaigns'),
+  create: (payload: Record<string, unknown>) => apiClient.post('/api/admin/campaigns', payload),
+  update: (id: string, payload: Record<string, unknown>) => apiClient.put(`/api/admin/campaigns/${id}`, payload),
+  delete: (id: string) => apiClient.delete(`/api/admin/campaigns/${id}`),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -457,8 +468,28 @@ export const notificationsService = {
 // 27. Calendar Events Manager
 // ─────────────────────────────────────────────────────────────────────────────
 export const eventsService = {
-  getAll: () => apiClient.get('/api/admin/events'),
+  getAll: () => apiClient.get('/api/events'),
   create: (payload: any) => apiClient.post('/api/admin/events', payload),
-  update: (eventId: string, payload: any) => apiClient.put(`/api/admin/events/${eventId}`, payload),
-  delete: (eventId: string) => apiClient.delete(`/api/admin/events/${eventId}`),
+  update: (id: string, payload: any) => apiClient.put(`/api/admin/events/${id}`, payload),
+  delete: (id: string) => apiClient.delete(`/api/admin/events/${id}`),
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 28. Class Pricing Plans
+// ─────────────────────────────────────────────────────────────────────────────
+export const classPlansService = {
+  getAll: () => apiClient.get('/api/admin/class-plans'),
+  create: (payload: any) => apiClient.post('/api/admin/class-plans', payload),
+  update: (id: string, payload: any) => apiClient.put(`/api/admin/class-plans/${id}`, payload),
+  delete: (id: string) => apiClient.delete(`/api/admin/class-plans/${id}`),
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 29. Media Gallery
+// ─────────────────────────────────────────────────────────────────────────────
+export const mediaGalleryService = {
+  getAll: () => apiClient.get('/api/admin/media'),
+  create: (payload: any) => apiClient.post('/api/admin/media', payload),
+  update: (id: string, payload: any) => apiClient.put(`/api/admin/media/${id}`, payload),
+  delete: (id: string) => apiClient.delete(`/api/admin/media/${id}`),
 };

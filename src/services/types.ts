@@ -190,9 +190,14 @@ export interface IntroVideo {
 export interface FounderData {
   id?: string;
   name?: string;
+  role?: string;
+  organization?: string;
   quote: string;
   message: string;
   photoUrl?: string;
+  verifiedStatus?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // ── Board Member ─────────────────────────────────────────────────────────────
@@ -233,6 +238,7 @@ export interface Partner {
   subtitle?: string;
   color?: string;
   bgAccent?: string;
+  logoUrl?: string;
   isActive: boolean;
   orderIndex: number;
 }
@@ -250,7 +256,9 @@ export interface FAQ {
 export interface Subscriber {
   id: string;
   email: string;
-  subscribedAt: string;
+  isActive?: boolean;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // ── Volunteer Log ────────────────────────────────────────────────────────────
@@ -279,20 +287,37 @@ export interface Campaign {
   id: string;
   title: string;
   description: string;
+  category?: string;
   targetAmount: number;
   raisedAmount: number;
-  isActive: boolean;
+  supportersCount?: number;
+  status?: string;
+  isActive?: boolean;
+  image?: string | null;
+  video?: string | null;
   endDate?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // ── Event ────────────────────────────────────────────────────────────────────
+export interface EventRegistration {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  registeredAt: string;
+}
+
 export interface Event {
   id: string;
+  eventId: string;
   title: string;
   description: string;
   date: string;
-  location?: string;
-  isActive: boolean;
+  registrations?: EventRegistration[];
+  created_at?: string;
+  updated_at?: string;
 }
 
 // ── Contact Inquiry ──────────────────────────────────────────────────────────
@@ -301,8 +326,29 @@ export interface ContactInquiry {
   name: string;
   email: string;
   message: string;
-  createdAt: string;
-  status?: 'Pending' | 'Resolved';
+  status?: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// ── Media Entry ──────────────────────────────────────────────────────────────
+export interface MediaEntry {
+  id: string;
+  title: string;
+  category: string;
+  url: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// ── Class Plan ───────────────────────────────────────────────────────────────
+export interface ClassPlan {
+  id: string;
+  classKey: string;
+  monthlyAmount: number;
+  annualAmount: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // ── AI Insight ───────────────────────────────────────────────────────────────

@@ -2,57 +2,58 @@
 
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { CalendarDays, Plus, Edit2, Trash2, Users, Check, ShieldAlert, X } from 'lucide-react';
+import { 
+  CalendarDays, 
+  Edit2, 
+  Trash2, 
+  Plus, 
+  AlertCircle,
+  Users,
+  Clock,
+  MapPin
+} from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog } from '@/components/ui/dialog';
-import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
 import { eventsService } from '@/services';
+import type { Event, EventRegistration } from '@/services/types';
 
 export default function EventsPage() {
   const queryClient = useQueryClient();
 
-  // Modal States
-  const [isEventModalOpen, setIsEventModalOpen] = useState(false);
-  const [isRegistrationsModalOpen, setIsRegistrationsModalOpen] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<any>(null);
-
-  // Form State
-  const [isEditMode, setIsEditMode] = useState(false);
-  const [eventForm, setEventForm] = useState({
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  
+  const [formData, setFormData] = useState<Partial<Event>>({
     eventId: '',
     title: '',
     description: '',
     date: '',
   });
 
-  // -- Queries --
-  const { data: eventsRaw, isLoading } = useQuery({
+  const { data, isLoading, error } = useQuery({
     queryKey: ['events'],
-    queryFn: () => eventsService.getAll().then(r => r.data),
+    queryFn: () => eventsService.getAll().then((r) => r.data),
   });
 
-  // Handle interceptor wrapping
-  const eventsList = Array.isArray(eventsRaw) 
-    ? eventsRaw 
-    : (Array.isArray(eventsRaw?.events) ? eventsRaw.events : []);
+  const eventsList: Event[] = Array.isArray(data) ? data : data?.items || [];
 
-  // -- Mutations --
   const createMutation = useMutation({
-    mutationFn: (data: any) => eventsService.create(data),
+    mutationFn: (payload: any) => eventsService.create(payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
-      setIsEventModalOpen(false);
+      closeModal();
     },
   });
 
   const updateMutation = useMutation({
-    mutationFn: (payload: { id: string; data: any }) => eventsService.update(payload.id, payload.data),
+    mutationFn: ({ id, payload }: { id: string; payload: any }) => eventsService.update(id, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['events'] });
-      setIsEventModalOpen(false);
+      closeModal();
     },
   });
 
@@ -63,241 +64,159 @@ export default function EventsPage() {
     },
   });
 
-  // -- Handlers --
-  const handleOpenAddEvent = () => {
-    setIsEditMode(false);
-    setEventForm({
-      eventId: `evt_${Date.now()}`,
-      title: '',
-      description: '',
-      date: new Date().toISOString().split('T')[0],
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingId(null);
+    setFormData({ 
+      eventId: '', title: '', description: '', date: ''
     });
-    setIsEventModalOpen(true);
   };
 
-  const handleOpenEditEvent = (evt: any) => {
-    setIsEditMode(true);
-    setEventForm({
-      eventId: evt.eventId,
-      title: evt.title,
-      description: evt.description,
-      date: evt.date ? evt.date.split('T')[0] : '', // format for yyyy-MM-dd input
+  const openEditModal = (event: Event) => {
+    setEditingId(event.id);
+    setFormData({
+      eventId: event.eventId || '',
+      title: event.title || '',
+      description: event.description || '',
+      date: event.date || '',
     });
-    setSelectedEvent(evt);
-    setIsEventModalOpen(true);
+    setIsModalOpen(true);
   };
 
-  const handleEventSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (isEditMode && selectedEvent) {
-      updateMutation.mutate({
-        id: selectedEvent.eventId,
-        data: eventForm
-      });
+    if (editingId) {
+      updateMutation.mutate({ id: editingId, payload: formData });
     } else {
-      createMutation.mutate(eventForm);
+      createMutation.mutate(formData);
     }
-  };
-
-  const handleDeleteEvent = (id: string) => {
-    if (confirm('Are you sure you want to delete this event? This action cannot be undone.')) {
-      deleteMutation.mutate(id);
-    }
-  };
-
-  const handleOpenRegistrations = (evt: any) => {
-    setSelectedEvent(evt);
-    setIsRegistrationsModalOpen(true);
   };
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 max-w-full">
-        {/* Header */}
+      <div className="space-y-6 max-w-full pb-10">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-3 sm:space-y-0">
           <div>
             <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center">
-              <CalendarDays className="mr-2 h-6 w-6 text-primary" />
+              <CalendarDays className="w-6 h-6 mr-2 text-primary" />
               Calendar Events
             </h1>
             <p className="text-xs text-muted-foreground mt-1">
-              Manage public events and view user registrations.
+              Manage upcoming events, camps, and view volunteer registrations.
             </p>
           </div>
-          <Button onClick={handleOpenAddEvent} className="font-bold">
-            <Plus className="mr-2 h-4 w-4" /> Add New Event
+          <Button onClick={() => setIsModalOpen(true)} className="h-9 font-bold text-xs">
+            <Plus className="mr-1.5 h-4 w-4" />
+            Create Event
           </Button>
         </div>
 
-        {/* Events Grid */}
         {isLoading ? (
           <div className="flex h-40 items-center justify-center">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
           </div>
+        ) : error ? (
+          <Card className="flex flex-col items-center justify-center h-64 border-dashed border-2 border-destructive/50">
+            <AlertCircle className="h-12 w-12 text-destructive mb-3" />
+            <h3 className="text-lg font-bold text-foreground">Failed to Load Events</h3>
+          </Card>
         ) : eventsList.length === 0 ? (
-          <Card className="flex flex-col items-center justify-center py-16 text-center border-dashed">
-            <ShieldAlert className="h-10 w-10 text-muted-foreground/40 mb-3" />
-            <p className="text-sm font-semibold text-muted-foreground">No events found.</p>
-            <p className="text-xs text-muted-foreground/60 mt-1">Click "Add New Event" to create your first event.</p>
+          <Card className="flex flex-col items-center justify-center h-64 border-dashed border-2 bg-muted/20">
+            <CalendarDays className="h-12 w-12 text-muted-foreground/40 mb-3" />
+            <h3 className="text-lg font-bold text-foreground">No Events Found</h3>
+            <Button onClick={() => setIsModalOpen(true)} variant="outline" size="sm" className="mt-4">Create First Event</Button>
           </Card>
         ) : (
-          <div className="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-            {eventsList.map((evt: any) => {
-              const registrations = Array.isArray(evt.registrations) ? evt.registrations : [];
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {eventsList.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime()).map((event) => {
+              const dateObj = new Date(event.date);
+              const isPast = dateObj.getTime() < new Date().getTime();
+              
               return (
-                <Card key={evt.id || evt.eventId} className="flex flex-col overflow-hidden hover:shadow-md transition-shadow">
-                  <div className="h-2 bg-primary/80" />
-                  <CardHeader className="pb-3">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <CardTitle className="text-base font-bold line-clamp-1">{evt.title}</CardTitle>
-                        <CardDescription className="text-xs mt-1 font-mono">{evt.date}</CardDescription>
+                <Card key={event.id} className={`flex flex-col overflow-hidden border border-border/60 hover:shadow-lg transition-all ${isPast ? 'opacity-70 bg-muted/20' : 'bg-card'}`}>
+                  
+                  {/* Top Bar */}
+                  <div className={`p-4 flex justify-between items-start border-b border-border/50 ${isPast ? 'bg-muted' : 'bg-primary/5'}`}>
+                    <div>
+                      <div className="flex items-center gap-2 mb-1">
+                        <Badge variant={isPast ? 'secondary' : 'default'} className="uppercase tracking-wider font-bold">
+                          {dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                        </Badge>
+                        <span className="text-xs font-mono text-muted-foreground bg-background px-2 py-0.5 rounded border border-border/50">
+                          {event.eventId}
+                        </span>
                       </div>
-                      <div className="flex gap-1 ml-2">
-                        <button 
-                          onClick={() => handleOpenEditEvent(evt)}
-                          className="h-7 w-7 rounded-md bg-secondary/80 hover:bg-secondary flex items-center justify-center text-foreground transition-colors"
-                        >
-                          <Edit2 className="h-3.5 w-3.5" />
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteEvent(evt.eventId)}
-                          className="h-7 w-7 rounded-md bg-destructive/10 hover:bg-destructive/20 flex items-center justify-center text-destructive transition-colors"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
-                      </div>
+                      <h3 className="font-extrabold text-lg text-foreground mt-1">{event.title}</h3>
                     </div>
-                  </CardHeader>
-                  <CardContent className="flex-1 flex flex-col">
-                    <p className="text-xs text-muted-foreground line-clamp-3 mb-4 flex-1">
-                      {evt.description}
-                    </p>
                     
-                    <div className="pt-4 border-t border-border mt-auto">
-                      <Button 
-                        variant="secondary" 
-                        className="w-full flex items-center justify-between text-xs h-9"
-                        onClick={() => handleOpenRegistrations(evt)}
-                      >
-                        <span className="flex items-center font-semibold">
-                          <Users className="h-3.5 w-3.5 mr-2" />
-                          Registrations
-                        </span>
-                        <span className="bg-background px-2 py-0.5 rounded-full font-bold">
-                          {registrations.length}
-                        </span>
+                    <div className="flex space-x-1">
+                      <Button size="icon" variant="ghost" className="h-8 w-8 bg-background/50 backdrop-blur" onClick={() => openEditModal(event)}>
+                        <Edit2 className="h-4 w-4" />
+                      </Button>
+                      <Button size="icon" variant="ghost" className="h-8 w-8 bg-background/50 backdrop-blur text-destructive hover:bg-destructive hover:text-white" onClick={() => {
+                        if (confirm('Delete this event?')) deleteMutation.mutate(event.id);
+                      }}>
+                        <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
-                  </CardContent>
+                  </div>
+                  
+                  {/* Body */}
+                  <div className="p-5 flex-1">
+                    <p className="text-sm text-muted-foreground leading-relaxed mb-4">{event.description}</p>
+                    
+                    <div className="bg-muted/30 border border-border/50 rounded-lg p-3">
+                      <div className="flex items-center gap-2 text-sm font-bold text-foreground mb-2">
+                        <Users className="w-4 h-4 text-primary" />
+                        Registrations ({event.registrations?.length || 0})
+                      </div>
+                      
+                      {event.registrations && event.registrations.length > 0 ? (
+                        <div className="space-y-2 max-h-40 overflow-y-auto pr-1">
+                          {event.registrations.map(reg => (
+                            <div key={reg.id} className="text-xs flex justify-between bg-background p-2 rounded border border-border shadow-sm">
+                              <div>
+                                <span className="font-bold block text-foreground">{reg.name}</span>
+                                <span className="text-muted-foreground">{reg.email}</span>
+                              </div>
+                              <div className="text-right">
+                                <span className="font-mono text-primary bg-primary/10 px-1.5 py-0.5 rounded">{reg.phone}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-xs text-muted-foreground italic text-center py-2">No registrations yet.</p>
+                      )}
+                    </div>
+                  </div>
                 </Card>
               );
             })}
           </div>
         )}
 
-        {/* Create / Edit Event Modal */}
-        <Dialog 
-          isOpen={isEventModalOpen} 
-          onClose={() => setIsEventModalOpen(false)} 
-          title={isEditMode ? "Edit Event" : "Create New Event"}
-        >
-          <form onSubmit={handleEventSubmit} className="space-y-4">
-            <Input
-              label="Event Title *"
-              value={eventForm.title}
-              onChange={(e) => setEventForm({...eventForm, title: e.target.value})}
-              required
-            />
-            
+        <Dialog isOpen={isModalOpen} onClose={closeModal} title={editingId ? 'Edit Event' : 'Create Event'}>
+          <form onSubmit={handleSubmit} className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
             <div className="grid grid-cols-2 gap-4">
-              <Input
-                label="Event ID (Unique String) *"
-                value={eventForm.eventId}
-                onChange={(e) => setEventForm({...eventForm, eventId: e.target.value})}
-                disabled={isEditMode} // Usually shouldn't change ID after creation
-                required
-              />
-              <Input
-                label="Event Date *"
-                type="date"
-                value={eventForm.date}
-                onChange={(e) => setEventForm({...eventForm, date: e.target.value})}
-                required
-              />
+              <Input label="Event Code ID *" value={formData.eventId} onChange={(e) => setFormData({...formData, eventId: e.target.value})} required placeholder="e.g. camp_health_2026" disabled={!!editingId} />
+              <div className="flex flex-col space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground">Event Date *</label>
+                <input type="date" value={formData.date ? formData.date.split('T')[0] : ''} onChange={(e) => setFormData({...formData, date: e.target.value})} required className="flex h-10 w-full rounded-lg border border-border bg-input/50 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/50" />
+              </div>
             </div>
 
-            <div className="space-y-1">
-              <label className="text-xs font-bold text-foreground">Description *</label>
-              <textarea
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50 resize-none"
-                rows={4}
-                value={eventForm.description}
-                onChange={(e) => setEventForm({...eventForm, description: e.target.value})}
-                required
-              />
+            <Input label="Event Title *" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} required placeholder="e.g. Health & Nutrition Camp" />
+            
+            <div className="flex flex-col space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground">Description *</label>
+              <textarea value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} required rows={3} className="flex w-full rounded-lg border border-border bg-input/50 px-3 py-2 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50" />
             </div>
 
-            <Button
-              type="submit"
-              className="w-full h-10 font-bold mt-2"
-              isLoading={createMutation.isPending || updateMutation.isPending}
-            >
-              <Check className="mr-2 h-4 w-4" />
-              {isEditMode ? 'Save Changes' : 'Create Event'}
+            <Button type="submit" className="w-full font-bold h-10 mt-2" isLoading={createMutation.isPending || updateMutation.isPending}>
+              {editingId ? 'Save Changes' : 'Create Event'}
             </Button>
           </form>
-        </Dialog>
-
-        {/* View Registrations Modal */}
-        <Dialog 
-          isOpen={isRegistrationsModalOpen} 
-          onClose={() => setIsRegistrationsModalOpen(false)} 
-          title="Event Registrations"
-        >
-          {selectedEvent && (
-            <div className="space-y-4">
-              <div className="bg-secondary/20 p-3 rounded-lg border border-border/40 mb-4">
-                <h3 className="text-sm font-bold text-foreground">{selectedEvent.title}</h3>
-                <p className="text-xs text-muted-foreground mt-1 font-mono">Date: {selectedEvent.date} | Event ID: {selectedEvent.eventId}</p>
-              </div>
-
-              {selectedEvent.registrations && selectedEvent.registrations.length > 0 ? (
-                <div className="rounded-md border overflow-hidden">
-                  <Table>
-                    <TableHeader className="bg-secondary/40">
-                      <TableRow>
-                        <TableHead className="text-xs font-bold">Name</TableHead>
-                        <TableHead className="text-xs font-bold">Contact Info</TableHead>
-                        <TableHead className="text-xs font-bold text-right">Registered On</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {selectedEvent.registrations.map((reg: any, i: number) => (
-                        <TableRow key={reg.id || i}>
-                          <TableCell className="py-2 text-sm font-semibold">{reg.name}</TableCell>
-                          <TableCell className="py-2 text-xs">
-                            <div className="flex flex-col">
-                              <span>{reg.phone}</span>
-                              <span className="text-muted-foreground">{reg.email}</span>
-                            </div>
-                          </TableCell>
-                          <TableCell className="py-2 text-xs text-right text-muted-foreground font-mono">
-                            {reg.registeredAt ? new Date(reg.registeredAt).toLocaleDateString('en-IN') : 'Unknown'}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-              ) : (
-                <div className="text-center py-10">
-                  <Users className="h-8 w-8 text-muted-foreground/30 mx-auto mb-2" />
-                  <p className="text-sm font-semibold text-muted-foreground">No registrations yet.</p>
-                </div>
-              )}
-            </div>
-          )}
         </Dialog>
       </div>
     </DashboardLayout>

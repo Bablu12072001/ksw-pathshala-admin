@@ -21,6 +21,15 @@ import {
   MonitorPlay,
   Video,
   CalendarDays,
+  Megaphone,
+  Quote,
+  Shield,
+  Star,
+  Building2,
+  HelpCircle,
+  MessageSquare,
+  Mail,
+  IndianRupee,
 } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
@@ -34,6 +43,20 @@ interface SidebarProps {
 export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
   const pathname = usePathname();
   const { user, logout } = useAppStore();
+  const scrollRef = React.useRef<HTMLElement>(null);
+
+  React.useEffect(() => {
+    if (scrollRef.current) {
+      const savedScroll = sessionStorage.getItem('sidebarScrollPos');
+      if (savedScroll) {
+        scrollRef.current.scrollTop = parseInt(savedScroll, 10);
+      }
+    }
+  }, []);
+
+  const handleScroll = (e: React.UIEvent<HTMLElement>) => {
+    sessionStorage.setItem('sidebarScrollPos', e.currentTarget.scrollTop.toString());
+  };
 
   const handleLogout = () => {
     logout();
@@ -54,6 +77,9 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         { title: 'Attendance', icon: CalendarCheck, path: '/attendance', roles: ['Admin', 'Coordinator'] },
         { title: 'Events', icon: CalendarDays, path: '/events', roles: ['Admin', 'Coordinator'] },
         { title: 'Donations & Sponsors', icon: CircleDollarSign, path: '/donations', roles: ['Admin', 'Coordinator', 'Sponsor'] },
+        { title: 'Contact Inquiries', icon: MessageSquare, path: '/inquiries', roles: ['Admin', 'Coordinator'] },
+        { title: 'Email Subscribers', icon: Mail, path: '/subscribers', roles: ['Admin', 'Coordinator'] },
+        { title: 'Class Pricing Plans', icon: IndianRupee, path: '/class-plans', roles: ['Admin'] },
         { title: 'GPS Tracking', icon: MapPin, path: '/gps', roles: ['Admin', 'Coordinator'] },
       ]
     },
@@ -64,7 +90,13 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         { title: 'Intro Videos', icon: Video, path: '/intro-videos', roles: ['Admin', 'Coordinator'] },
         { title: 'Board Members', icon: Users, path: '/members', roles: ['Admin', 'Coordinator'] },
         { title: 'Activities Feed', icon: ImageIcon, path: '/activities', roles: ['Admin', 'Coordinator', 'Sponsor'] },
-        { title: 'Reports Hub', icon: FileText, path: '/reports', roles: ['Admin', 'Coordinator', 'Sponsor'] },
+        { title: 'Campaigns', icon: Megaphone, path: '/campaigns', roles: ['Admin', 'Coordinator'] },
+        { title: 'Founder Corner', icon: Quote, path: '/founder', roles: ['Admin'] },
+        { title: 'Trust Credentials', icon: Shield, path: '/credentials', roles: ['Admin'] },
+        { title: 'Reviews & Testimonials', icon: Star, path: '/reviews', roles: ['Admin', 'Coordinator'] },
+        { title: 'Corporate Partners', icon: Building2, path: '/partners', roles: ['Admin', 'Coordinator'] },
+        { title: 'FAQs', icon: HelpCircle, path: '/faqs', roles: ['Admin', 'Coordinator'] },
+        { title: 'Media Gallery', icon: ImageIcon, path: '/media', roles: ['Admin', 'Coordinator'] },
       ]
     },
     {
@@ -135,7 +167,11 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
         </div>
 
         {/* Navigation Links */}
-        <nav className="flex-1 px-3 py-2 space-y-4 overflow-y-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent relative z-10">
+        <nav 
+          ref={scrollRef} 
+          onScroll={handleScroll}
+          className="flex-1 px-3 py-2 space-y-4 overflow-y-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent relative z-10"
+        >
           {filteredGroups.map((group, groupIdx) => (
             <div key={group.name} className={groupIdx > 0 ? "pt-2" : ""}>
               <div className="px-4 mb-2 text-xxs font-black tracking-widest text-muted-foreground/60 uppercase">

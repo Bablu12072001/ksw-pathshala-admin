@@ -187,9 +187,9 @@ export default function DonationsPage() {
 
             <Select
               options={[
-                { label: 'All Statuses', value: '' },
-                { label: 'Verified', value: 'Verified' },
-                { label: 'Pending Verification', value: 'Pending Verification' },
+                { label: 'All', value: '' },
+                { label: 'Success', value: 'Verified' },
+                { label: 'Pending', value: 'Pending Verification' },
               ]}
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
