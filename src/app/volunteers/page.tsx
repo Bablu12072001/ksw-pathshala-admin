@@ -307,7 +307,7 @@ export default function VolunteersPage() {
                 { label: 'All Statuses', value: '' },
                 { label: 'Approved', value: 'approved' },
                 { label: 'Pending', value: 'pending' },
-                { label: 'Inactive', value: 'inactive' },
+                { label: 'Rejected', value: 'rejected' },
               ]}
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
@@ -404,12 +404,12 @@ export default function VolunteersPage() {
                             <Button
                               variant="ghost"
                               onClick={() => {
-                                updateMutation.mutate({ id: volunteer.id, fields: { status: 'inactive' } });
+                                updateMutation.mutate({ id: volunteer.id, fields: { status: 'rejected' } });
                               }}
                               className="h-8 px-2.5 text-xs text-amber-500 hover:bg-amber-500/10"
-                              title="Set Inactive"
+                              title="Reject"
                             >
-                              <XCircle className="h-3.5 w-3.5 mr-1.5" /> Deactivate
+                              <XCircle className="h-3.5 w-3.5 mr-1.5" /> Reject
                             </Button>
                           )}
                           <Button
