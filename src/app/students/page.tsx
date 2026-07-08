@@ -115,6 +115,7 @@ export default function StudentsPage() {
     setFormData({
       fullName: student.fullName || student.name || '',
       age: String(student.age || ''),
+      dob: student.dob || '',
       gender: student.gender || student.sex || 'Male',
       gradeClass: student.gradeClass || student.grade || '',
       guardianName: student.guardianName || student.parentName || '',
