@@ -2,8 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Calendar, UserCheck, Check, X, ShieldAlert } from 'lucide-react';
+import { Calendar, UserCheck, Check, X, ShieldAlert, Users, CalendarCheck, MapPin, Building, BookOpen } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
+import { PageTabs } from '@/components/layout/page-tabs';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -11,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
 import { Pagination } from '@/components/ui/pagination';
-import { studentsService, teachersService, attendanceService } from '@/services';
+import { studentsService, teachersService, attendanceService, classesService } from '@/services';
 
 export default function AttendancePage() {
   const queryClient = useQueryClient();
@@ -19,7 +20,7 @@ export default function AttendancePage() {
   // Control state variables
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [entityType, setEntityType] = useState<'Student' | 'Teacher'>('Student');
-  const [gradeFilter, setGradeFilter] = useState('Class 5'); // filter students by grade to simplify roll call
+  const [gradeFilter, setGradeFilter] = useState(''); // filter students by grade to simplify roll call
   
   // Local checklist draft state
   const [attendanceDraft, setAttendanceDraft] = useState<{ [entityId: string]: 'Present' | 'Absent' }>({});
@@ -46,6 +47,12 @@ export default function AttendancePage() {
     queryKey: ['existingAttendance', selectedDate, entityType],
     queryFn: () =>
       attendanceService.getByDate(selectedDate, entityType).then((r) => r.data),
+  });
+
+  // 4. Fetch Classes for dropdown
+  const { data: classesData } = useQuery({
+    queryKey: ['classes'],
+    queryFn: () => classesService.getAll().then((r) => r.data),
   });
 
   // Sync draft from DB records or set defaults when database records update
@@ -128,16 +135,26 @@ export default function AttendancePage() {
   const absentCount = Object.values(attendanceDraft).filter((s) => s === 'Absent').length;
   const rate = totalInList > 0 ? Math.round((presentCount / totalInList) * 100) : 100;
 
+  const classesList = Array.isArray(classesData) ? classesData : (classesData?.items || classesData?.classes || []);
+  const uniqueClassNames = Array.from(new Set(classesList.map((c: any) => c.name)));
+  const dynamicClassOptions = uniqueClassNames.map((name: any) => ({ label: name, value: name }));
+
   return (
     <DashboardLayout>
       <div className="space-y-6 max-w-full">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-3 sm:space-y-0">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Attendance Registry</h1>
-            <p className="text-xs text-muted-foreground">
-              Register daily school student roll calls and teacher workspace attendance.
-            </p>
+        {/* Header & Tabs */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-2">
+          <div className="flex-1 w-full">
+            <PageTabs 
+              title="Attendance Registry" 
+              description="Register daily school student roll calls and teacher workspace attendance."
+              tabs={[
+                { title: 'Student Directory', path: '/students', icon: Users },
+                { title: 'Attendance', path: '/attendance', icon: CalendarCheck },
+                { title: 'Branches', path: '/branches', icon: Building },
+                { title: 'Classes', path: '/classes', icon: BookOpen }
+              ]}
+            />
           </div>
           <div className="flex items-center space-x-2">
             <Calendar className="h-4 w-4 text-muted-foreground" />
@@ -175,14 +192,7 @@ export default function AttendancePage() {
             
             {entityType === 'Student' && (
               <Select
-                options={[
-                  { label: 'Class 1', value: 'Class 1' },
-                  { label: 'Class 2', value: 'Class 2' },
-                  { label: 'Class 3', value: 'Class 3' },
-                  { label: 'Class 4', value: 'Class 4' },
-                  { label: 'Class 5', value: 'Class 5' },
-                  { label: 'Class 6', value: 'Class 6' },
-                ]}
+                options={[{ label: 'All Classes', value: '' }, ...dynamicClassOptions]}
                 value={gradeFilter}
                 onChange={(e) => setGradeFilter(e.target.value)}
                 className="h-10 text-xs w-44"

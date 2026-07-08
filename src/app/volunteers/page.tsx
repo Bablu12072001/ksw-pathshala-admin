@@ -2,8 +2,9 @@
 
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search, Plus, Edit2, Trash2, UserCheck, XCircle, Award, Shield, Image as ImageIcon, AlertCircle, Eye } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, UserCheck, XCircle, Award, Shield, Image as ImageIcon, AlertCircle, Eye, ClipboardList, FileText, Users } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
+import { PageTabs } from '@/components/layout/page-tabs';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -276,15 +277,20 @@ export default function VolunteersPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6 max-w-full">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-3 sm:space-y-0">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Volunteers Registry</h1>
-            <p className="text-xs text-muted-foreground">
-              Manage community volunteers, credentials, and records.
-            </p>
+        {/* Header & Tabs */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-2">
+          <div className="flex-1 w-full">
+            <PageTabs 
+              title="Volunteers Registry" 
+              description="Manage community volunteers, credentials, and track their tasks."
+              tabs={[
+                { title: 'Directory', path: '/volunteers', icon: Users },
+                { title: 'Tasks', path: '/volunteer-tasks', icon: ClipboardList },
+                { title: 'Claims', path: '/volunteer-claims', icon: FileText }
+              ]}
+            />
           </div>
-          <Button onClick={handleOpenAdd} className="h-9 font-bold text-xs">
+          <Button onClick={handleOpenAdd} className="h-10 font-bold text-xs md:mb-8 shadow-md">
             <Plus className="mr-1.5 h-4 w-4" />
             Onboard Volunteer
           </Button>

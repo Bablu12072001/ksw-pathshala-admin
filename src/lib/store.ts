@@ -37,6 +37,7 @@ interface AppState {
 
   // Notifications state
   notifications: SystemNotification[];
+  hasFetchedNotifications: boolean;
   setNotifications: (notifications: SystemNotification[]) => void;
   markAsRead: (id: string) => void;
   markAllAsRead: () => void;
@@ -81,7 +82,8 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // Notifications state
   notifications: [],
-  setNotifications: (notifications) => set({ notifications }),
+  hasFetchedNotifications: false,
+  setNotifications: (notifications) => set({ notifications, hasFetchedNotifications: true }),
   markAsRead: (id) => {
     set((state) => ({
       notifications: state.notifications.map((n) =>

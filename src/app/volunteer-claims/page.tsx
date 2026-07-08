@@ -2,8 +2,9 @@
 
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { FileText, CheckCircle, Trash2, Edit2, Eye, ShieldAlert, Check } from 'lucide-react';
+import { FileText, CheckCircle, Trash2, Edit2, Eye, ShieldAlert, Check, Users, ClipboardList } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
+import { PageTabs } from '@/components/layout/page-tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -121,15 +122,17 @@ export default function VolunteerClaimsPage() {
     <DashboardLayout>
       <div className="space-y-6 max-w-full">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-3 sm:space-y-0">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground flex items-center">
-              <FileText className="mr-2 h-6 w-6 text-primary" />
-              Donation Claims
-            </h1>
-            <p className="text-xs text-muted-foreground mt-1">
-              Process volunteer donation claims, award points, and verify proofs.
-            </p>
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-2">
+          <div className="flex-1 w-full">
+            <PageTabs 
+              title="Donation Claims" 
+              description="Process volunteer donation claims, award points, and verify proofs."
+              tabs={[
+                { title: 'Directory', path: '/volunteers', icon: Users },
+                { title: 'Tasks', path: '/volunteer-tasks', icon: ClipboardList },
+                { title: 'Claims', path: '/volunteer-claims', icon: FileText }
+              ]}
+            />
           </div>
         </div>
 

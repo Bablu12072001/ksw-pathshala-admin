@@ -2,8 +2,9 @@
 
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { MapPin, Navigation, CheckCircle, AlertTriangle, Compass, ShieldAlert } from 'lucide-react';
+import { MapPin, Navigation, CheckCircle, AlertTriangle, Compass, ShieldAlert, GraduationCap } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
+import { PageTabs } from '@/components/layout/page-tabs';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -47,12 +48,18 @@ export default function GpsPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6 max-w-full">
-        {/* Header */}
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">GPS Tracking & Geofencing</h1>
-          <p className="text-xs text-muted-foreground">
-            Classroom center geofencing verification audits for faculty check-ins.
-          </p>
+        {/* Header & Tabs */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-2">
+          <div className="flex-1 w-full">
+            <PageTabs 
+              title="GPS Tracking & Geofencing" 
+              description="Classroom center geofencing verification audits for faculty check-ins."
+              tabs={[
+                { title: 'Teachers Directory', path: '/teachers', icon: GraduationCap },
+                { title: 'GPS Tracking', path: '/gps', icon: MapPin }
+              ]}
+            />
+          </div>
         </div>
 
         {/* 2. Log History */}

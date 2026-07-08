@@ -493,3 +493,23 @@ export const mediaGalleryService = {
   update: (id: string, payload: any) => apiClient.put(`/api/admin/media/${id}`, payload),
   delete: (id: string) => apiClient.delete(`/api/admin/media/${id}`),
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 30. Branches Manager
+// ─────────────────────────────────────────────────────────────────────────────
+export const branchesService = {
+  getAll: () => apiClient.get('/api/admin/branches'),
+  create: (payload: any) => apiClient.post('/api/admin/branches', payload),
+  update: (id: string, payload: any) => apiClient.put(`/api/admin/branches/${id}`, payload),
+  delete: (id: string) => apiClient.delete(`/api/admin/branches/${id}`),
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 31. Classes Manager
+// ─────────────────────────────────────────────────────────────────────────────
+export const classesService = {
+  getAll: (params?: { branchId?: string }) => apiClient.get('/api/admin/classes', { params }),
+  create: (payload: any) => apiClient.post('/api/admin/classes', payload),
+  update: (id: string, payload: any) => apiClient.put(`/api/admin/classes/${id}`, payload),
+  delete: (id: string) => apiClient.delete(`/api/admin/classes/${id}`),
+};

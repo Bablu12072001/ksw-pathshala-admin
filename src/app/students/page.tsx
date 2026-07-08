@@ -2,8 +2,9 @@
 
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search, Plus, Edit2, Trash2, CheckCircle2, UserCheck, XCircle, Eye } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, CheckCircle2, UserCheck, XCircle, Eye, Users, CalendarCheck, MapPin, Building, BookOpen } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
+import { PageTabs } from '@/components/layout/page-tabs';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,7 +14,7 @@ import { Dialog } from '@/components/ui/dialog';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
 import { Pagination } from '@/components/ui/pagination';
 import { useAppStore } from '@/lib/store';
-import { studentsService } from '@/services';
+import { studentsService, classesService, branchesService, mediaService } from '@/services';
 
 export default function StudentsPage() {
   const queryClient = useQueryClient();
@@ -32,19 +33,27 @@ export default function StudentsPage() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [viewData, setViewData] = useState<any>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
 
   // Form states
   const [selectedStudent, setSelectedStudent] = useState<any>(null);
   const [formData, setFormData] = useState({
     fullName: '',
     age: '',
-    gender: 'Male',
-    gradeClass: 'Class 1',
+    dob: '',
+    gender: '',
+    gradeClass: '',
     guardianName: '',
     phone: '',
     homeAddress: '',
     slumLocation: '',
     status: 'active',
+    branchId: '',
+    classId: '',
+    photoUrl: '',
+    academicRating: '',
+    teacherNotes: '',
   });
 
   // 1. Fetch Students via Axios admin API
@@ -52,6 +61,18 @@ export default function StudentsPage() {
     queryKey: ['students', searchTerm, gradeFilter, statusFilter],
     queryFn: () =>
       studentsService.getAll({ search: searchTerm, grade: gradeFilter, status: statusFilter }).then((r) => r.data),
+  });
+
+  // 2. Fetch Classes for dropdown
+  const { data: classesData } = useQuery({
+    queryKey: ['classes'],
+    queryFn: () => classesService.getAll().then((r) => r.data),
+  });
+
+  // 3. Fetch Branches for dropdown
+  const { data: branchesData } = useQuery({
+    queryKey: ['branches'],
+    queryFn: () => branchesService.getAll().then((r) => r.data),
   });
 
   // Mutations
@@ -94,13 +115,18 @@ export default function StudentsPage() {
     setFormData({
       fullName: student.fullName || student.name || '',
       age: String(student.age || ''),
-      gender: student.gender || 'Male',
-      gradeClass: student.gradeClass || student.grade || 'Class 1',
-      guardianName: student.guardianName || '',
+      gender: student.gender || student.sex || 'Male',
+      gradeClass: student.gradeClass || student.grade || '',
+      guardianName: student.guardianName || student.parentName || '',
       phone: student.phone || '',
       homeAddress: student.homeAddress || student.address || '',
       slumLocation: student.slumLocation || '',
       status: student.status || 'active',
+      branchId: student.branchId?.id || student.branchId?._id || (typeof student.branchId === 'string' ? student.branchId : ''),
+      classId: student.classId?.id || student.classId?._id || (typeof student.classId === 'string' ? student.classId : ''),
+      photoUrl: student.photoUrl || '',
+      academicRating: student.academicRating || '',
+      teacherNotes: student.teacherNotes || '',
     });
     setIsEditOpen(true);
   };
@@ -126,18 +152,71 @@ export default function StudentsPage() {
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => {
+      const updates: any = { [name]: value };
+      
+      if (name === 'classId') {
+        const cls = classesList.find((c: any) => c.id === value);
+        if (cls) {
+          updates.gradeClass = cls.name;
+        } else {
+          updates.gradeClass = '';
+        }
+      }
+      
+      return { ...prev, ...updates };
+    });
+  };
+
+  const performUpload = async (file: File, folder: string): Promise<string | null> => {
+    try {
+      const presignRes = await mediaService.generatePresignedUrls({
+        folder,
+        files: [{ filename: file.name, fileType: file.type }]
+      });
+      const fileData = presignRes.data?.files?.[0];
+      if (!fileData || !fileData.uploadUrl) {
+        throw new Error('Failed to retrieve upload URL');
+      }
+      const uploadRes = await fetch(fileData.uploadUrl, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type },
+      });
+      if (!uploadRes.ok) throw new Error('Failed to upload image to S3');
+      return fileData.imageUrl;
+    } catch (err: any) {
+      console.error('Upload error:', err);
+      setUploadError(err.message || 'Image upload failed.');
+      return null;
+    }
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploading(true);
+    setUploadError('');
+    const url = await performUpload(file, 'students');
+    if (url) {
+      setFormData(prev => ({ ...prev, photoUrl: url }));
+    }
+    setIsUploading(false);
   };
 
   const handleAddSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    createMutation.mutate(formData);
+    const payload = { ...formData };
+    if (!payload.dob) delete (payload as any).dob;
+    createMutation.mutate(payload);
   };
 
   const handleEditSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedStudent) {
-      updateMutation.mutate({ id: selectedStudent.id, fields: formData });
+      const payload = { ...formData };
+      if (!payload.dob) delete (payload as any).dob;
+      updateMutation.mutate({ id: selectedStudent.id, fields: payload });
     }
   };
 
@@ -145,25 +224,34 @@ export default function StudentsPage() {
     setFormData({
       fullName: '',
       age: '',
-      gender: 'Male',
-      gradeClass: 'Class 1',
+      dob: '',
+      gender: '',
+      gradeClass: '',
       guardianName: '',
       phone: '',
       homeAddress: '',
       slumLocation: '',
       status: 'active',
+      branchId: '',
+      classId: '',
+      photoUrl: '',
+      academicRating: '',
+      teacherNotes: '',
     });
   };
 
   // Grade options listing
+  const classesList = Array.isArray(classesData) ? classesData : (classesData?.items || classesData?.classes || []);
+  const uniqueClassNames = Array.from(new Set(classesList.map((c: any) => c.name)));
+  const dynamicClassOptions = uniqueClassNames.map((name: any) => ({ label: name, value: name }));
+  const classIdOptions = classesList.map((c: any) => ({ label: c.name, value: c.id }));
+
+  const branchesList = Array.isArray(branchesData) ? branchesData : (branchesData?.items || branchesData?.branches || []);
+  const branchIdOptions = branchesList.map((b: any) => ({ label: b.name, value: b.id }));
+
   const gradeOptions = [
     { label: 'All Classes', value: '' },
-    { label: 'Class 1', value: 'Class 1' },
-    { label: 'Class 2', value: 'Class 2' },
-    { label: 'Class 3', value: 'Class 3' },
-    { label: 'Class 4', value: 'Class 4' },
-    { label: 'Class 5', value: 'Class 5' },
-    { label: 'Class 6', value: 'Class 6' },
+    ...classIdOptions
   ];
 
   // Status options listing
@@ -178,16 +266,22 @@ export default function StudentsPage() {
   return (
     <DashboardLayout>
       <div className="space-y-6 max-w-full">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-3 sm:space-y-0">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Students Registry</h1>
-            <p className="text-xs text-muted-foreground">
-              Manage KSW Pathshala student listings, sponsor associations, and approvals.
-            </p>
+        {/* Header & Tabs */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-2">
+          <div className="flex-1 w-full">
+            <PageTabs 
+              title="Students Registry" 
+              description="Manage KSW Pathshala student listings, sponsor associations, and approvals."
+              tabs={[
+                { title: 'Student Directory', path: '/students', icon: Users },
+                { title: 'Attendance', path: '/attendance', icon: CalendarCheck },
+                { title: 'Branches', path: '/branches', icon: Building },
+                { title: 'Classes', path: '/classes', icon: BookOpen }
+              ]}
+            />
           </div>
           {!isSponsor && (
-            <Button onClick={handleOpenAdd} className="h-9 font-bold text-xs">
+            <Button onClick={handleOpenAdd} className="h-10 font-bold text-xs md:mb-8 shadow-md">
               <Plus className="mr-1.5 h-4 w-4" />
               Onboard Student
             </Button>
@@ -269,14 +363,23 @@ export default function StudentsPage() {
                   {paginatedStudents.map((student: any) => (
                     <TableRow key={student.id}>
                       <TableCell className="py-3.5 font-bold text-xs text-foreground">
-                        {student.fullName || student.name}
+                        <div className="flex items-center space-x-3">
+                          <div className="h-8 w-8 rounded-full overflow-hidden bg-secondary flex-shrink-0 border border-border/50">
+                            {(student.photoUrl || student.profileImage) ? (
+                              <img src={student.photoUrl || student.profileImage} alt={student.fullName} className="h-full w-full object-cover" />
+                            ) : (
+                              <UserCheck className="h-4 w-4 m-auto mt-2 text-muted-foreground/70" />
+                            )}
+                          </div>
+                          <span>{student.fullName || student.name}</span>
+                        </div>
                       </TableCell>
                       <TableCell className="py-3.5 text-xs text-muted-foreground">
                         {student.age} yrs / {student.gender}
                       </TableCell>
                       <TableCell className="py-3.5 text-xs">
                         <Badge variant="outline" className="font-semibold text-xxs bg-secondary/35">
-                          {student.gradeClass || student.grade}
+                          {classesList.find((c: any) => c.id === (student.gradeClass || student.grade))?.name || student.gradeClass || student.grade}
                         </Badge>
                       </TableCell>
                       <TableCell className="py-3.5 text-xs">
@@ -404,28 +507,22 @@ export default function StudentsPage() {
                 label="Gender *"
                 name="gender"
                 options={[
+                  { label: 'Select Gender', value: '' },
                   { label: 'Male', value: 'Male' },
                   { label: 'Female', value: 'Female' },
                   { label: 'Other', value: 'Other' },
                 ]}
                 value={formData.gender}
                 onChange={handleFormChange}
+                required
               />
               <Select
                 label="Grade Class *"
-                name="gradeClass"
-                options={[
-                  { label: 'LKG', value: 'LKG' },
-                  { label: 'UKG', value: 'UKG' },
-                  { label: 'Class 1', value: 'Class 1' },
-                  { label: 'Class 2', value: 'Class 2' },
-                  { label: 'Class 3', value: 'Class 3' },
-                  { label: 'Class 4', value: 'Class 4' },
-                  { label: 'Class 5', value: 'Class 5' },
-                  { label: 'Class 6', value: 'Class 6' },
-                ]}
-                value={formData.gradeClass}
+                name="classId"
+                options={[{ label: 'Select a Class', value: '' }, ...classIdOptions]}
+                value={formData.classId}
                 onChange={handleFormChange}
+                required
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -454,6 +551,52 @@ export default function StudentsPage() {
                 label="Slum Location"
                 name="slumLocation"
                 value={formData.slumLocation}
+                onChange={handleFormChange}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Select
+                label="Branch *"
+                name="branchId"
+                options={[{ label: 'Select a Branch', value: '' }, ...branchIdOptions]}
+                value={formData.branchId}
+                onChange={handleFormChange}
+                required
+              />
+              <Input
+                label="Academic Rating"
+                name="academicRating"
+                placeholder="e.g. Very Good"
+                value={formData.academicRating}
+                onChange={handleFormChange}
+              />
+            </div>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-semibold">Photo Upload</label>
+                <div className="flex items-center space-x-4">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    className="flex-1 text-xs"
+                  />
+                  {isUploading && <span className="text-xs text-primary animate-pulse">Uploading...</span>}
+                  {formData.photoUrl && !isUploading && (
+                    <div className="h-10 w-10 rounded overflow-hidden flex-shrink-0 border bg-secondary">
+                      <img src={formData.photoUrl} alt="Preview" className="h-full w-full object-cover" />
+                    </div>
+                  )}
+                </div>
+                {uploadError && <p className="text-xs text-destructive">{uploadError}</p>}
+              </div>
+            </div>
+            <div className="space-y-4">
+              <Input
+                label="Teacher Notes"
+                name="teacherNotes"
+                placeholder="Bright and attentive student."
+                value={formData.teacherNotes}
                 onChange={handleFormChange}
               />
             </div>
@@ -488,28 +631,22 @@ export default function StudentsPage() {
                 label="Gender *"
                 name="gender"
                 options={[
+                  { label: 'Select Gender', value: '' },
                   { label: 'Male', value: 'Male' },
                   { label: 'Female', value: 'Female' },
                   { label: 'Other', value: 'Other' },
                 ]}
                 value={formData.gender}
                 onChange={handleFormChange}
+                required
               />
               <Select
                 label="Grade Class *"
-                name="gradeClass"
-                options={[
-                  { label: 'LKG', value: 'LKG' },
-                  { label: 'UKG', value: 'UKG' },
-                  { label: 'Class 1', value: 'Class 1' },
-                  { label: 'Class 2', value: 'Class 2' },
-                  { label: 'Class 3', value: 'Class 3' },
-                  { label: 'Class 4', value: 'Class 4' },
-                  { label: 'Class 5', value: 'Class 5' },
-                  { label: 'Class 6', value: 'Class 6' },
-                ]}
-                value={formData.gradeClass}
+                name="classId"
+                options={[{ label: 'Select a Class', value: '' }, ...classIdOptions]}
+                value={formData.classId}
                 onChange={handleFormChange}
+                required
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -538,6 +675,52 @@ export default function StudentsPage() {
                 label="Slum Location"
                 name="slumLocation"
                 value={formData.slumLocation}
+                onChange={handleFormChange}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Select
+                label="Branch *"
+                name="branchId"
+                options={[{ label: 'Select a Branch', value: '' }, ...branchIdOptions]}
+                value={formData.branchId}
+                onChange={handleFormChange}
+                required
+              />
+              <Input
+                label="Academic Rating"
+                name="academicRating"
+                placeholder="e.g. Very Good"
+                value={formData.academicRating}
+                onChange={handleFormChange}
+              />
+            </div>
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-semibold">Photo Upload</label>
+                <div className="flex items-center space-x-4">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    className="flex-1 text-xs"
+                  />
+                  {isUploading && <span className="text-xs text-primary animate-pulse">Uploading...</span>}
+                  {formData.photoUrl && !isUploading && (
+                    <div className="h-10 w-10 rounded overflow-hidden flex-shrink-0 border bg-secondary">
+                      <img src={formData.photoUrl} alt="Preview" className="h-full w-full object-cover" />
+                    </div>
+                  )}
+                </div>
+                {uploadError && <p className="text-xs text-destructive">{uploadError}</p>}
+              </div>
+            </div>
+            <div className="space-y-4">
+              <Input
+                label="Teacher Notes"
+                name="teacherNotes"
+                placeholder="Bright and attentive student."
+                value={formData.teacherNotes}
                 onChange={handleFormChange}
               />
             </div>
@@ -580,15 +763,16 @@ export default function StudentsPage() {
             <div className="space-y-4">
               <div className="flex items-center space-x-4 mb-4">
                 <div className="h-16 w-16 rounded-full overflow-hidden bg-secondary">
-                  {viewData.profileImage ? (
-                    <img src={viewData.profileImage} alt={viewData.fullName} className="h-full w-full object-cover" />
+                  {(viewData.photoUrl || viewData.profileImage) ? (
+                    <img src={viewData.photoUrl || viewData.profileImage} alt={viewData.fullName} className="h-full w-full object-cover" />
                   ) : (
                     <UserCheck className="h-8 w-8 m-auto mt-4 text-muted-foreground" />
                   )}
                 </div>
                 <div>
                   <h3 className="text-lg font-bold text-foreground">{viewData.fullName || viewData.name}</h3>
-                  <Badge variant="outline" className="mt-1">{viewData.gradeClass || viewData.grade}</Badge>
+                  <Badge variant="outline" className="mt-1">{viewData.classId?.name || classesList.find((c: any) => c.id === (viewData.gradeClass || viewData.grade))?.name || viewData.gradeClass || viewData.grade}</Badge>
+                  {viewData.academicRating && <Badge variant="secondary" className="mt-1 ml-2">{viewData.academicRating}</Badge>}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -601,6 +785,14 @@ export default function StudentsPage() {
                   <Badge variant={viewData.status === 'active' || viewData.status === 'Approved' ? 'success' : 'warning'}>
                     {viewData.status || 'active'}
                   </Badge>
+                </div>
+                <div>
+                  <p className="text-xxxxs text-muted-foreground uppercase tracking-wider">Branch</p>
+                  <p className="text-sm font-semibold">{viewData.branchId?.name || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-xxxxs text-muted-foreground uppercase tracking-wider">Attendance</p>
+                  <p className="text-sm font-semibold">{viewData.attendancePercentage ?? 'N/A'}%</p>
                 </div>
                 <div>
                   <p className="text-xxxxs text-muted-foreground uppercase tracking-wider">Guardian Name</p>
@@ -618,7 +810,38 @@ export default function StudentsPage() {
                   <p className="text-xxxxs text-muted-foreground uppercase tracking-wider">Slum Location</p>
                   <p className="text-sm font-semibold">{viewData.slumLocation || 'N/A'}</p>
                 </div>
+                <div className="col-span-2">
+                  <p className="text-xxxxs text-muted-foreground uppercase tracking-wider">Teacher Notes</p>
+                  <p className="text-sm font-semibold">{viewData.teacherNotes || 'N/A'}</p>
+                </div>
               </div>
+              {!isSponsor && (
+                <div className="flex items-center justify-end space-x-3 pt-4 mt-6 border-t border-border/40">
+                  <Button
+                    variant="outline"
+                    className="text-destructive hover:bg-destructive/10"
+                    onClick={() => {
+                      handleDeactivate(viewData.id);
+                      setIsViewModalOpen(false);
+                    }}
+                    isLoading={updateMutation.isPending}
+                  >
+                    <XCircle className="mr-2 h-4 w-4" />
+                    Reject (Deactivate)
+                  </Button>
+                  <Button
+                    className="bg-success text-white hover:bg-success/90"
+                    onClick={() => {
+                      handleApprove(viewData.id);
+                      setIsViewModalOpen(false);
+                    }}
+                    isLoading={updateMutation.isPending}
+                  >
+                    <CheckCircle2 className="mr-2 h-4 w-4" />
+                    Approve (Activate)
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </Dialog>

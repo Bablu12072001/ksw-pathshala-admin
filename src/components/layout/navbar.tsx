@@ -10,12 +10,13 @@ import { dashboardService } from '@/services';
 
 export function Navbar() {
   const pathname = usePathname();
-  const { theme, toggleTheme, notifications, markAsRead, markAllAsRead, setNotifications } = useAppStore();
+  const { theme, toggleTheme, notifications, hasFetchedNotifications, markAsRead, markAllAsRead, setNotifications } = useAppStore();
   const [showNotifications, setShowNotifications] = useState(false);
 
   // Sync initial notifications from API
   useEffect(() => {
     async function fetchNotifications() {
+      if (hasFetchedNotifications) return;
       try {
         const res = await dashboardService.getNotifications();
         if (res.data) {
@@ -27,7 +28,7 @@ export function Navbar() {
       }
     }
     fetchNotifications();
-  }, [setNotifications]);
+  }, [hasFetchedNotifications, setNotifications]);
 
   // Generate breadcrumb titles
   const getBreadcrumbs = () => {

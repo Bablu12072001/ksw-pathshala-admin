@@ -211,7 +211,7 @@ export default function Dashboard() {
               </p>
             </CardContent>
           </Card>
-          
+
           {/* Overall Attendance */}
           <Card className="h-full flex flex-col justify-between hover:shadow-lg transition-all duration-300 relative overflow-hidden group border-sky-500/20">
             <div className="absolute inset-0 bg-gradient-to-br from-sky-500/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />

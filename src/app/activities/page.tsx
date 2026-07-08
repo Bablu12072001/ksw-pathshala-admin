@@ -14,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { Dialog } from '@/components/ui/dialog';
 import { useAppStore } from '@/lib/store';
-import { activitiesService, mediaService } from '@/services';
+import { activitiesService, mediaService, classesService } from '@/services';
 
 interface MediaItem {
   file?: File;
@@ -48,6 +48,12 @@ export default function ActivitiesPage() {
   const { data: activitiesData, isLoading } = useQuery({
     queryKey: ['activities'],
     queryFn: () => activitiesService.getAll().then((r) => r.data),
+  });
+
+  // 2. Fetch Classes for dropdown
+  const { data: classesData } = useQuery({
+    queryKey: ['classes'],
+    queryFn: () => classesService.getAll().then((r) => r.data),
   });
 
   // Upload processing helper
@@ -188,6 +194,10 @@ export default function ActivitiesPage() {
     return match ? match[1] : null;
   };
 
+  const classesList = Array.isArray(classesData) ? classesData : (classesData?.items || classesData?.classes || []);
+  const uniqueClassNames = Array.from(new Set(classesList.map((c: any) => c.name)));
+  const dynamicClassOptions = uniqueClassNames.map((name: any) => ({ label: name, value: name }));
+
   return (
     <DashboardLayout>
       <div className="space-y-6 max-w-full pb-10">
@@ -318,11 +328,7 @@ export default function ActivitiesPage() {
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Select label="Target Class" name="class" options={[
-                  { label: 'Class 1', value: 'Class 1' }, { label: 'Class 2', value: 'Class 2' },
-                  { label: 'Class 3', value: 'Class 3' }, { label: 'Class 4', value: 'Class 4' },
-                  { label: 'Class 5', value: 'Class 5' }, { label: 'Class 6', value: 'Class 6' },
-                ]} value={formData.class} onChange={handleFormChange} />
+              <Select label="Target Class" name="class" options={[{ label: 'Select a Class', value: '' }, ...dynamicClassOptions]} value={formData.class} onChange={handleFormChange} />
               <Input label="Author Name *" name="author" required placeholder="e.g. Rajesh Kumar" value={formData.author} onChange={handleFormChange} />
             </div>
             

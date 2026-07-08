@@ -2,8 +2,9 @@
 
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search, Plus, Edit2, Trash2, UserCheck, XCircle, MapPin, Eye } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, UserCheck, XCircle, MapPin, Eye, GraduationCap, CheckCircle2 } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
+import { PageTabs } from '@/components/layout/page-tabs';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,7 +14,7 @@ import { Dialog } from '@/components/ui/dialog';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
 import { Pagination } from '@/components/ui/pagination';
 import { LocationPicker } from '@/components/ui/location-picker';
-import { teachersService } from '@/services';
+import { teachersService, classesService, branchesService, mediaService } from '@/services';
 
 export default function TeachersPage() {
   const queryClient = useQueryClient();
@@ -26,6 +27,8 @@ export default function TeachersPage() {
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState('');
 
   // Form states
   const [selectedTeacher, setSelectedTeacher] = useState<any>(null);
@@ -36,7 +39,10 @@ export default function TeachersPage() {
     phone: '',
     password: '',
     qualification: '',
-    assignedClass: 'Class 1',
+    assignedClass: '',
+    branchId: '',
+    classId: '',
+    photoUrl: '',
     latitude: '',
     longitude: '',
     radius: '200',
@@ -47,6 +53,18 @@ export default function TeachersPage() {
   const { data: teachersData, isLoading } = useQuery({
     queryKey: ['teachers', searchTerm, statusFilter],
     queryFn: () => teachersService.getAll({ search: searchTerm, status: statusFilter }).then((r) => r.data),
+  });
+
+  // 2. Fetch Classes for dropdown
+  const { data: classesData } = useQuery({
+    queryKey: ['classes'],
+    queryFn: () => classesService.getAll().then((r) => r.data),
+  });
+
+  // 3. Fetch Branches for dropdown
+  const { data: branchesData } = useQuery({
+    queryKey: ['branches'],
+    queryFn: () => branchesService.getAll().then((r) => r.data),
   });
 
   // Mutations
@@ -91,12 +109,15 @@ export default function TeachersPage() {
       email: teacher.email,
       phone: teacher.phone,
       password: teacher.password || '',
-      qualification: teacher.qualification,
-      assignedClass: teacher.assignedClass,
+      qualification: teacher.qualification || '',
+      assignedClass: teacher.assignedClass || '',
+      branchId: teacher.branchId?.id || teacher.branchId?._id || (typeof teacher.branchId === 'string' ? teacher.branchId : ''),
+      classId: teacher.classId?.id || teacher.classId?._id || (typeof teacher.classId === 'string' ? teacher.classId : ''),
+      photoUrl: teacher.profileImage || teacher.photoUrl || '',
       latitude: String(teacher.gpsTargetLocation?.latitude || teacher.location?.latitude || '0'),
       longitude: String(teacher.gpsTargetLocation?.longitude || teacher.location?.longitude || '0'),
       radius: String(teacher.gpsTargetLocation?.radius || '200'),
-      status: teacher.status,
+      status: teacher.status || 'Pending Approval',
     });
     setIsEditOpen(true);
   };
@@ -116,9 +137,60 @@ export default function TeachersPage() {
     updateMutation.mutate({ id, fields: { status: 'active' } });
   };
 
+  const handleDeactivate = (id: string) => {
+    updateMutation.mutate({ id, fields: { status: 'Inactive' } });
+  };
+
+  const performUpload = async (file: File, folder: string = 'teachers') => {
+    try {
+      const presignRes = await mediaService.generatePresignedUrls({
+        folder,
+        files: [{ filename: file.name, fileType: file.type }]
+      });
+      const fileData = presignRes.data?.files?.[0];
+      if (!fileData || !fileData.uploadUrl) {
+        throw new Error('Failed to retrieve upload URL');
+      }
+
+      const uploadRes = await fetch(fileData.uploadUrl, {
+        method: 'PUT',
+        body: file,
+        headers: { 'Content-Type': file.type }
+      });
+      if (!uploadRes.ok) throw new Error('Failed to upload image to S3');
+      return fileData.imageUrl;
+    } catch (err) {
+      console.error("Upload failed", err);
+      setUploadError("Failed to upload image. Please try again.");
+      return null;
+    }
+  };
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploading(true);
+    setUploadError('');
+    const url = await performUpload(file, 'teachers');
+    if (url) {
+      setFormData(prev => ({ ...prev, photoUrl: url }));
+    }
+    setIsUploading(false);
+  };
+
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData((prev) => ({ ...prev, [name]: value }));
+    setFormData((prev) => {
+      const updates: any = { [name]: value };
+      if (name === 'classId') {
+        const classesList = Array.isArray(classesData) ? classesData : (classesData?.items || classesData?.classes || []);
+        const cls = classesList.find((c: any) => c.id === value);
+        if (cls) {
+          updates.assignedClass = cls.name;
+        }
+      }
+      return { ...prev, ...updates };
+    });
   };
 
   const handleAddSubmit = (e: React.FormEvent) => {
@@ -130,6 +202,9 @@ export default function TeachersPage() {
       password: formData.password,
       qualification: formData.qualification,
       assignedClass: formData.assignedClass,
+      branchId: formData.branchId,
+      classId: formData.classId,
+      profileImage: formData.photoUrl,
       gpsTargetLocation: {
         latitude: formData.latitude,
         longitude: formData.longitude,
@@ -149,6 +224,9 @@ export default function TeachersPage() {
         password: formData.password,
         qualification: formData.qualification,
         assignedClass: formData.assignedClass,
+        branchId: formData.branchId,
+        classId: formData.classId,
+        profileImage: formData.photoUrl,
         status: formData.status,
         gpsTargetLocation: {
           latitude: formData.latitude,
@@ -167,26 +245,40 @@ export default function TeachersPage() {
       phone: '',
       password: '',
       qualification: '',
-      assignedClass: 'Class 1',
+      assignedClass: '',
+      branchId: '',
+      classId: '',
+      photoUrl: '',
       latitude: '',
       longitude: '',
       radius: '200',
       status: 'Pending Approval',
     });
+    setUploadError('');
   };
+
+  const classesList = Array.isArray(classesData) ? classesData : (classesData?.items || classesData?.classes || []);
+  const classIdOptions = classesList.map((c: any) => ({ label: c.name, value: c.id }));
+
+  const branchesList = Array.isArray(branchesData) ? branchesData : (branchesData?.items || branchesData?.branches || []);
+  const branchIdOptions = branchesList.map((b: any) => ({ label: b.name, value: b.id }));
 
   return (
     <DashboardLayout>
       <div className="space-y-6 max-w-full">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-3 sm:space-y-0">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-foreground">Teachers Registry</h1>
-            <p className="text-xs text-muted-foreground">
-              Manage school faculty records, classroom centers, and GPS coordinates mapping.
-            </p>
+        {/* Header & Tabs */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4 mb-2">
+          <div className="flex-1 w-full">
+            <PageTabs 
+              title="Teachers Registry" 
+              description="Manage school faculty records, classroom centers, and GPS coordinates mapping."
+              tabs={[
+                { title: 'Teachers Directory', path: '/teachers', icon: GraduationCap },
+                { title: 'GPS Tracking', path: '/gps', icon: MapPin }
+              ]}
+            />
           </div>
-          <Button onClick={handleOpenAdd} className="h-9 font-bold text-xs">
+          <Button onClick={handleOpenAdd} className="h-10 font-bold text-xs md:mb-8 shadow-md">
             <Plus className="mr-1.5 h-4 w-4" />
             Onboard Teacher
           </Button>
@@ -256,7 +348,16 @@ export default function TeachersPage() {
                     return paginatedTeachers.map((teacher: any) => (
                     <TableRow key={teacher.id}>
                       <TableCell className="py-3.5 font-bold text-xs text-foreground">
-                        {teacher.fullName || teacher.name || 'Unknown Teacher'}
+                        <div className="flex items-center space-x-3">
+                          <div className="h-8 w-8 rounded-full overflow-hidden bg-secondary flex-shrink-0 border border-border/50">
+                            {(teacher.photoUrl || teacher.profileImage) ? (
+                              <img src={teacher.photoUrl || teacher.profileImage} alt={teacher.fullName} className="h-full w-full object-cover" />
+                            ) : (
+                              <UserCheck className="h-4 w-4 m-auto mt-2 text-muted-foreground/70" />
+                            )}
+                          </div>
+                          <span>{teacher.fullName || teacher.name || 'Unknown Teacher'}</span>
+                        </div>
                       </TableCell>
                       <TableCell className="py-3.5 text-xs">
                         <div className="font-semibold">{teacher.email || 'No email provided'}</div>
@@ -405,21 +506,56 @@ export default function TeachersPage() {
                 value={formData.qualification}
                 onChange={handleFormChange}
               />
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground/90">Profile Photo</label>
+                <div className="relative">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    className="cursor-pointer file:text-xs file:font-semibold file:bg-primary/10 file:text-primary file:border-0 file:mr-4 file:px-4 file:py-2 file:rounded-full hover:file:bg-primary/20 h-12"
+                    disabled={isUploading}
+                  />
+                  {isUploading && (
+                    <div className="absolute right-3 top-3">
+                      <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    </div>
+                  )}
+                </div>
+                {uploadError && <p className="text-xs text-destructive">{uploadError}</p>}
+                {formData.photoUrl && (
+                  <p className="text-xs text-success font-medium flex items-center mt-1">
+                    <CheckCircle2 className="h-3 w-3 mr-1" /> Photo uploaded successfully
+                  </p>
+                )}
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <Select
-                label="Class Assigned"
+                label="Branch Location *"
+                name="branchId"
+                options={[{ label: 'Select a Branch', value: '' }, ...branchIdOptions]}
+                value={formData.branchId}
+                onChange={handleFormChange}
+                required
+              />
+              <Select
+                label="Class Assigned *"
+                name="classId"
+                options={[{ label: 'Select a Class', value: '' }, ...classIdOptions]}
+                value={formData.classId}
+                onChange={handleFormChange}
+                required
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="Assigned Class Label *"
                 name="assignedClass"
-                options={[
-                  { label: 'Class 1', value: 'Class 1' },
-                  { label: 'Class 2', value: 'Class 2' },
-                  { label: 'Class 3', value: 'Class 3' },
-                  { label: 'Class 4', value: 'Class 4' },
-                  { label: 'Class 5', value: 'Class 5' },
-                  { label: 'Class 6', value: 'Class 6' },
-                ]}
                 value={formData.assignedClass}
                 onChange={handleFormChange}
+                placeholder="Auto-filled from class"
+                required
               />
               <Input
                 label="Geofence Radius (meters) *"
@@ -487,21 +623,52 @@ export default function TeachersPage() {
                 value={formData.qualification}
                 onChange={handleFormChange}
               />
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground/90">Profile Photo</label>
+                <div className="relative flex gap-2 items-center">
+                  {formData.photoUrl && (
+                    <img src={formData.photoUrl} alt="Preview" className="h-10 w-10 rounded-full object-cover border" />
+                  )}
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={handlePhotoUpload}
+                    className="cursor-pointer file:text-xs file:font-semibold file:bg-primary/10 file:text-primary file:border-0 file:mr-2 file:px-3 file:py-1 file:rounded-full hover:file:bg-primary/20 h-10 flex-1"
+                    disabled={isUploading}
+                  />
+                  {isUploading && (
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                  )}
+                </div>
+                {uploadError && <p className="text-xs text-destructive">{uploadError}</p>}
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <Select
-                label="Class Assigned"
+                label="Branch Location *"
+                name="branchId"
+                options={[{ label: 'Select a Branch', value: '' }, ...branchIdOptions]}
+                value={formData.branchId}
+                onChange={handleFormChange}
+                required
+              />
+              <Select
+                label="Class Assigned *"
+                name="classId"
+                options={[{ label: 'Select a Class', value: '' }, ...classIdOptions]}
+                value={formData.classId}
+                onChange={handleFormChange}
+                required
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="Assigned Class Label *"
                 name="assignedClass"
-                options={[
-                  { label: 'Class 1', value: 'Class 1' },
-                  { label: 'Class 2', value: 'Class 2' },
-                  { label: 'Class 3', value: 'Class 3' },
-                  { label: 'Class 4', value: 'Class 4' },
-                  { label: 'Class 5', value: 'Class 5' },
-                  { label: 'Class 6', value: 'Class 6' },
-                ]}
                 value={formData.assignedClass}
                 onChange={handleFormChange}
+                placeholder="Auto-filled from class"
+                required
               />
               <Input
                 label="Geofence Radius (meters) *"
@@ -556,8 +723,8 @@ export default function TeachersPage() {
             <div className="space-y-4">
               <div className="flex items-center space-x-4 mb-4">
                 <div className="h-16 w-16 rounded-full overflow-hidden bg-secondary">
-                  {viewData.profileImage ? (
-                    <img src={viewData.profileImage} alt={viewData.fullName} className="h-full w-full object-cover" />
+                  {(viewData.photoUrl || viewData.profileImage) ? (
+                    <img src={viewData.photoUrl || viewData.profileImage} alt={viewData.fullName} className="h-full w-full object-cover" />
                   ) : (
                     <UserCheck className="h-8 w-8 m-auto mt-4 text-muted-foreground" />
                   )}
@@ -583,9 +750,13 @@ export default function TeachersPage() {
                   <p className="text-sm font-semibold">{viewData.qualification || 'N/A'}</p>
                 </div>
                 <div>
+                  <p className="text-xxxxs text-muted-foreground uppercase tracking-wider">Branch</p>
+                  <p className="text-sm font-semibold">{viewData.branchId?.name || 'N/A'}</p>
+                </div>
+                <div>
                   <p className="text-xxxxs text-muted-foreground uppercase tracking-wider">Assigned Class</p>
                   <Badge variant="outline" className="font-semibold text-xxs bg-secondary/35">
-                    {viewData.assignedClass || 'N/A'}
+                    {viewData.classId?.name || viewData.assignedClass || 'N/A'}
                   </Badge>
                 </div>
                 <div className="col-span-2">
@@ -598,6 +769,31 @@ export default function TeachersPage() {
                     {viewData.gpsTargetLocation?.latitude ? Number(viewData.gpsTargetLocation.latitude).toFixed(4) : '0.0000'}°, {viewData.gpsTargetLocation?.longitude ? Number(viewData.gpsTargetLocation.longitude).toFixed(4) : '0.0000'}°
                   </div>
                 </div>
+              </div>
+              <div className="flex items-center justify-end space-x-3 pt-4 mt-6 border-t border-border/40">
+                <Button
+                  variant="outline"
+                  className="text-destructive hover:bg-destructive/10"
+                  onClick={() => {
+                    handleDeactivate(viewData.id);
+                    setIsViewModalOpen(false);
+                  }}
+                  isLoading={updateMutation.isPending}
+                >
+                  <XCircle className="mr-2 h-4 w-4" />
+                  Reject (Deactivate)
+                </Button>
+                <Button
+                  className="bg-success text-white hover:bg-success/90"
+                  onClick={() => {
+                    handleApprove(viewData.id);
+                    setIsViewModalOpen(false);
+                  }}
+                  isLoading={updateMutation.isPending}
+                >
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Approve (Activate)
+                </Button>
               </div>
             </div>
           )}
