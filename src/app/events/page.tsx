@@ -39,7 +39,10 @@ export default function EventsPage() {
     queryFn: () => eventsService.getAll().then((r) => r.data),
   });
 
-  const eventsList: Event[] = Array.isArray(data) ? data : data?.items || [];
+  const rawList = Array.isArray(data?.events) 
+    ? data.events 
+    : (Array.isArray(data) ? data : (data?.data || data?.items || []));
+  const eventsList: Event[] = Array.isArray(rawList) ? rawList : [];
 
   const createMutation = useMutation({
     mutationFn: (payload: any) => eventsService.create(payload),

@@ -134,6 +134,10 @@ export interface ActivityPayload {
 export const authService = {
   login: (payload: LoginPayload) =>
     apiClient.post<LoginResponse>('/api/auth/login', payload),
+  forgotPassword: (payload: { email: string; role: string }) =>
+    apiClient.post('/api/auth/forgot-password', payload),
+  resetPassword: (payload: { email: string; otp: string; newPassword: string }) =>
+    apiClient.post('/api/auth/reset-password', payload),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -355,6 +359,10 @@ export const volunteersService = {
 
   /** DELETE /api/admin/volunteers/:id – remove volunteer */
   delete: (id: string) => apiClient.delete(`/api/admin/volunteers/${id}`),
+
+  /** POST /api/admin/volunteers/:id/certificate - generate certificate */
+  generateCertificate: (id: string, payload: { duration: string }) =>
+    apiClient.post(`/api/admin/volunteers/${id}/certificate`, payload),
 };
 
 
@@ -363,16 +371,20 @@ export const volunteersService = {
 // ─────────────────────────────────────────────────────────────────────────────
 export const donationsService = {
   /** GET /api/admin/donations */
-  getAll: (params?: { search?: string; status?: string }) =>
+  getAll: (params?: { search?: string; status?: string; paymentMethod?: string }) =>
     apiClient.get('/api/admin/donations', { params }),
 
   /** POST /api/admin/donations – log a contribution */
   create: (payload: Record<string, unknown>) =>
     apiClient.post('/api/admin/donations', payload),
 
-  /** PATCH /api/admin/donations/:id – verify payment */
+  /** PUT /api/admin/donations/:id – verify payment */
   update: (id: string, payload: Record<string, unknown>) =>
-    apiClient.patch(`/api/admin/donations/${id}`, payload),
+    apiClient.put(`/api/admin/donations/${id}`, payload),
+
+  /** DELETE /api/admin/donations/:id */
+  delete: (id: string) =>
+    apiClient.delete(`/api/admin/donations/${id}`),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -462,6 +474,7 @@ export const inquiriesService = {
 export const notificationsService = {
   /** GET /api/admin/notifications */
   getAll: () => apiClient.get('/api/admin/notifications'),
+  send: (payload: any) => apiClient.post('/api/admin/notifications/send', payload),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -513,3 +526,4 @@ export const classesService = {
   update: (id: string, payload: any) => apiClient.put(`/api/admin/classes/${id}`, payload),
   delete: (id: string) => apiClient.delete(`/api/admin/classes/${id}`),
 };
+

@@ -23,15 +23,40 @@ const apiClient = axios.create({
   timeout: 15000, // 15 s
 });
 
+// Helper to check token expiration
+function isTokenExpired(token: string) {
+  try {
+    const payloadBase64 = token.split('.')[1];
+    const decodedJson = atob(payloadBase64);
+    const payload = JSON.parse(decodedJson);
+    if (payload.exp) {
+      const expTime = payload.exp * 1000;
+      return Date.now() > expTime;
+    }
+    return false;
+  } catch (e) {
+    return false;
+  }
+}
+
 // ── Request interceptor – attach Bearer token ───────────────────────────────
 apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     if (typeof window !== 'undefined') {
       const session = localStorage.getItem('user_session');
       if (session) {
-        const parsed = JSON.parse(session);
-        if (parsed?.token) {
-          config.headers.Authorization = `Bearer ${parsed.token}`;
+        try {
+          const parsed = JSON.parse(session);
+          if (parsed?.token) {
+            if (isTokenExpired(parsed.token)) {
+              localStorage.removeItem('user_session');
+              window.location.href = '/login';
+              return Promise.reject(new Error('Token expired'));
+            }
+            config.headers.Authorization = `Bearer ${parsed.token}`;
+          }
+        } catch (e) {
+          // ignore parse errors
         }
       }
     }

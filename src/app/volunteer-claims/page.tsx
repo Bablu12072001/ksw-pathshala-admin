@@ -44,7 +44,7 @@ export default function VolunteerClaimsPage() {
   // Pagination and Filters
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
-  const [statusFilter, setStatusFilter] = useState('pending'); // default to pending
+  const [statusFilter, setStatusFilter] = useState('all'); // default to all
 
   // -- Queries --
   const { data: claimsRaw, isLoading } = useQuery({

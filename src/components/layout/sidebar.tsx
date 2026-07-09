@@ -147,6 +147,14 @@ export function Sidebar({ isOpen, setIsOpen }: SidebarProps) {
           ]
         },
         { 
+          title: 'Communications', 
+          icon: Megaphone, 
+          roles: ['Admin', 'Coordinator'],
+          subItems: [
+            { title: 'Communication Broadcasting', path: '/communications' },
+          ]
+        },
+        { 
           title: 'System Settings', 
           icon: Settings, 
           roles: ['Admin', 'Coordinator', 'Sponsor'],

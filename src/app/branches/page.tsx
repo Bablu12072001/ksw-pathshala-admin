@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Search, Plus, Edit2, Trash2, Building, BookOpen, Users, CalendarCheck } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, Building, BookOpen, Users, CalendarCheck, IndianRupee } from 'lucide-react';
 import { DashboardLayout } from '@/components/layout/dashboard-layout';
 import { PageTabs } from '@/components/layout/page-tabs';
 import { Card, CardContent } from '@/components/ui/card';

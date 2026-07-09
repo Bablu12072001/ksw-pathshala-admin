@@ -29,6 +29,10 @@ export default function VolunteersPage() {
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [viewData, setViewData] = useState<any>(null);
 
+  const [isCertModalOpen, setIsCertModalOpen] = useState(false);
+  const [certVolunteerId, setCertVolunteerId] = useState('');
+  const [certDuration, setCertDuration] = useState('6 months');
+
   // Form states
   const [formData, setFormData] = useState({
     fullName: '',
@@ -80,6 +84,16 @@ export default function VolunteersPage() {
       queryClient.invalidateQueries({ queryKey: ['volunteers'] });
       setIsDeleteOpen(false);
       setSelectedVolunteer(null);
+    },
+  });
+
+  const generateCertMutation = useMutation({
+    mutationFn: ({ id, duration }: { id: string; duration: string }) => 
+      volunteersService.generateCertificate(id, { duration }).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['volunteers'] });
+      setIsCertModalOpen(false);
+      setCertVolunteerId('');
     },
   });
 
@@ -429,6 +443,19 @@ export default function VolunteersPage() {
                           >
                             <Eye className="h-3.5 w-3.5 mr-1.5" /> View
                           </Button>
+                          {!volunteer.certificate?.id && (
+                            <Button
+                              variant="ghost"
+                              onClick={() => {
+                                setCertVolunteerId(volunteer.id);
+                                setIsCertModalOpen(true);
+                              }}
+                              className="h-8 px-2.5 text-xs text-purple-500 hover:bg-purple-500/10"
+                              title="Generate Certificate"
+                            >
+                              <Shield className="h-3.5 w-3.5 mr-1.5" /> Gen Cert
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             onClick={() => handleOpenEdit(volunteer)}
@@ -664,16 +691,54 @@ export default function VolunteersPage() {
                 )}
               </div>
 
-              {viewData.certificate?.id && (
+              {viewData.certificate?.id ? (
                 <div className="mt-4 p-3 bg-emerald-500/10 rounded-lg border border-emerald-500/20">
                   <p className="text-xs font-bold text-emerald-600 mb-1 flex items-center"><Shield className="h-4 w-4 mr-1" /> Certification Issued</p>
                   <p className="text-xs text-emerald-600/80">Cert No: {viewData.certificate.certificateNo}</p>
+                </div>
+              ) : (
+                <div className="mt-4 flex justify-end">
+                  <Button
+                    onClick={() => {
+                      setCertVolunteerId(viewData.id);
+                      setIsCertModalOpen(true);
+                      setIsViewModalOpen(false); // Close view modal so it doesn't overlap weirdly, or we can keep it open
+                    }}
+                    className="h-9 px-4 text-xs bg-purple-600 hover:bg-purple-700 text-white"
+                  >
+                    <Shield className="h-4 w-4 mr-2" /> Generate Certificate
+                  </Button>
                 </div>
               )}
             </div>
           )}
         </Dialog>
 
+        {/* Generate Certificate Modal */}
+        <Dialog isOpen={isCertModalOpen} onClose={() => setIsCertModalOpen(false)} title="Generate Certificate">
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Please specify the duration of the volunteer's service to generate their certificate.
+            </p>
+            <Input
+              label="Duration"
+              value={certDuration}
+              onChange={(e) => setCertDuration(e.target.value)}
+              placeholder="e.g. 6 months"
+            />
+            <div className="flex justify-end gap-2 mt-4">
+              <Button variant="outline" onClick={() => setIsCertModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => generateCertMutation.mutate({ id: certVolunteerId, duration: certDuration })}
+                isLoading={generateCertMutation.isPending}
+              >
+                Generate
+              </Button>
+            </div>
+          </div>
+        </Dialog>
       </div>
     </DashboardLayout>
   );
