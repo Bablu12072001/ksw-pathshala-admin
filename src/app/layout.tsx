@@ -26,6 +26,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className="h-full">
+      <head>
+      </head>
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased min-h-full`}>
         <ReactQueryProvider>
           {children}

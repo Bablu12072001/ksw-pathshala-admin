@@ -7,7 +7,12 @@ export default function RootPage() {
   const router = useRouter();
 
   useEffect(() => {
-    router.push('/dashboard');
+    const hasSession = localStorage.getItem('user_session');
+    if (hasSession) {
+      router.push('/dashboard');
+    } else {
+      router.push('/login');
+    }
   }, [router]);
 
   return (

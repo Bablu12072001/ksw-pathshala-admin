@@ -61,7 +61,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   // Auth state
-  user: null,
+  user: typeof window !== 'undefined' && localStorage.getItem('user_session') 
+    ? (() => {
+        try { return JSON.parse(localStorage.getItem('user_session')!); }
+        catch { return null; }
+      })() 
+    : null,
   otpCode: null,
   otpPhone: null,
   isLoading: false,

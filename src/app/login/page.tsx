@@ -30,7 +30,6 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [hydrated, setHydrated] = useState(false);
 
   // Sync user session and redirect if already logged in
   useEffect(() => {
@@ -42,18 +41,17 @@ export default function LoginPage() {
         console.error('Failed to parse user session', err);
       }
     }
-    setHydrated(true);
   }, [login, user]);
 
   useEffect(() => {
-    if (hydrated && user) {
+    if (user) {
       router.push('/dashboard');
     }
-  }, [hydrated, user, router]);
+  }, [user, router]);
 
-  // Prevent flash of login form if user is already authenticated
-  if (!hydrated || user) {
-    return <div className="min-h-screen bg-background" />;
+  // If already authenticated, do not render the login form to avoid a flash
+  if (user) {
+    return null;
   }
 
   // ── Password login via real API ──────────────────────────────────────────────
