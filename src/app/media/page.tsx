@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   Image as ImageIcon, 
@@ -26,14 +26,18 @@ export default function MediaGalleryPage() {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [playingId, setPlayingId] = useState<string | null>(null);
   
   const [formData, setFormData] = useState<Partial<MediaEntry>>({
     title: '',
-    category: 'activities',
-    url: '',
+    category: 'gallery',
+    media_url: '',
+    publisher: '',
+    type: 'image',
+    order_index: 1,
+    status: true,
   });
 
-  const [mediaType, setMediaType] = useState<'image' | 'video' | 'youtube'>('image');
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -43,6 +47,20 @@ export default function MediaGalleryPage() {
   });
 
   const mediaList: MediaEntry[] = Array.isArray(data) ? data : data?.items || [];
+
+  // Auto-calculate order_index for new entries when type or category changes
+  useEffect(() => {
+    if (!editingId && isModalOpen) {
+      let filtered = mediaList;
+      if (formData.type === 'video') {
+        filtered = mediaList.filter(m => m.type === 'video');
+      } else {
+        filtered = mediaList.filter(m => m.category === formData.category && m.type !== 'video');
+      }
+      const max = filtered.reduce((acc, curr) => Math.max(acc, curr.order_index || 0), 0);
+      setFormData(prev => ({ ...prev, order_index: max + 1 }));
+    }
+  }, [formData.type, formData.category, isModalOpen, editingId, mediaList]);
 
   const createMutation = useMutation({
     mutationFn: (payload: any) => mediaGalleryService.create(payload),
@@ -71,13 +89,18 @@ export default function MediaGalleryPage() {
     setIsModalOpen(false);
     setEditingId(null);
     setUploadFile(null);
-    setMediaType('image');
     setFormData({ 
-      title: '', category: 'activities', url: '' 
+      title: '', 
+      category: 'gallery', 
+      media_url: '', 
+      publisher: '', 
+      type: 'image',
+      order_index: 1,
+      status: true,
     });
   };
 
-  const inferMediaType = (url?: string) => {
+  const inferMediaTypeFromUrl = (url?: string) => {
     if (!url) return 'image';
     if (url.includes('youtube.com') || url.includes('youtu.be')) return 'youtube';
     if (url.endsWith('.mp4') || url.endsWith('.webm') || url.endsWith('.ogg')) return 'video';
@@ -88,10 +111,13 @@ export default function MediaGalleryPage() {
     setEditingId(entry.id);
     setFormData({
       title: entry.title || '',
-      category: entry.category || 'activities',
-      url: entry.url || '',
+      category: entry.category || 'gallery',
+      media_url: entry.media_url || '',
+      publisher: entry.publisher || '',
+      type: entry.type || 'image',
+      order_index: entry.order_index || 1,
+      status: entry.status ?? true,
     });
-    setMediaType(inferMediaType(entry.url || ''));
     setUploadFile(null);
     setIsModalOpen(true);
   };
@@ -102,21 +128,26 @@ export default function MediaGalleryPage() {
   };
 
   const performUpload = async (): Promise<string | null> => {
-    if (!uploadFile) return formData.url || null;
+    if (!uploadFile) return formData.media_url || null;
     setIsUploading(true);
     try {
       const presignRes = await mediaService.generatePresignedUrls({
-        folder: 'gallery',
-        files: [{ filename: uploadFile.name, fileType: uploadFile.type }]
+        folder: formData.category || 'gallery',
+        fileName: uploadFile.name,
+        fileType: uploadFile.type || 'image/jpeg',
+        files: [{ filename: uploadFile.name, fileType: uploadFile.type || 'image/jpeg' }]
       });
-      const fileData = presignRes.data?.files?.[0];
-      if (!fileData) throw new Error('Failed to get upload URL');
+      
+      const uploadUrl = presignRes.data?.uploadUrl || presignRes.data?.files?.[0]?.uploadUrl;
+      const imageUrl = presignRes.data?.fileUrl || presignRes.data?.imageUrl || presignRes.data?.media_url || presignRes.data?.url || presignRes.data?.files?.[0]?.imageUrl;
+      
+      if (!uploadUrl) throw new Error('Failed to get upload URL');
 
-      await fetch(fileData.uploadUrl, { method: 'PUT', body: uploadFile, headers: { 'Content-Type': uploadFile.type }});
-      return fileData.imageUrl;
-    } catch (err) {
-      console.error(err);
-      alert('Media upload failed.');
+      await fetch(uploadUrl, { method: 'PUT', body: uploadFile, headers: { 'Content-Type': uploadFile.type || 'image/jpeg' }});
+      return imageUrl || uploadUrl.split('?')[0]; // fallback to stripping query string from upload URL
+    } catch (err: any) {
+      console.error('Upload Error:', err.response?.data || err.message);
+      alert(`Media upload failed: ${err.response?.data?.message || err.message}`);
       return null;
     } finally {
       setIsUploading(false);
@@ -125,12 +156,19 @@ export default function MediaGalleryPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    let finalUrl = formData.url;
-    if (mediaType !== 'youtube' && uploadFile) {
+    let finalUrl = formData.media_url;
+    const isYoutube = inferMediaTypeFromUrl(finalUrl) === 'youtube';
+    
+    if (!isYoutube && uploadFile) {
       const uploadedUrl = await performUpload();
       if (uploadedUrl) finalUrl = uploadedUrl;
     }
-    const payload = { ...formData, url: finalUrl };
+    
+    const payload = { 
+      ...formData, 
+      media_url: finalUrl,
+      publisher: formData.publisher || null
+    };
 
     if (editingId) {
       updateMutation.mutate({ id: editingId, payload });
@@ -149,7 +187,7 @@ export default function MediaGalleryPage() {
               Media Gallery
             </h1>
             <p className="text-xs text-muted-foreground mt-1">
-              Manage images and videos shown in the press and activities gallery.
+              Manage images and videos shown in the press and gallery sections.
             </p>
           </div>
           <Button onClick={() => setIsModalOpen(true)} className="h-9 font-bold text-xs">
@@ -174,42 +212,68 @@ export default function MediaGalleryPage() {
             <Button onClick={() => setIsModalOpen(true)} variant="outline" size="sm" className="mt-4">Upload First Media</Button>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {mediaList.map((entry) => {
-              const type = inferMediaType(entry.url);
+              const displayType = inferMediaTypeFromUrl(entry.media_url);
+              const isPlaying = playingId === entry.id;
               
               return (
-                <Card key={entry.id} className="group relative overflow-hidden border border-border/60 hover:shadow-lg transition-all duration-300">
+                <Card key={entry.id} className="group relative overflow-hidden border border-border/60 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300">
                   <div className="absolute top-2 right-2 flex space-x-1 opacity-0 group-hover:opacity-100 transition-opacity z-20">
-                    <Button size="icon" variant="secondary" className="h-7 w-7 rounded-full shadow-sm bg-background/80 backdrop-blur" onClick={() => openEditModal(entry)}>
-                      <Edit2 className="h-3.5 w-3.5" />
+                    <Button size="icon" variant="secondary" className="h-8 w-8 rounded-full shadow-sm bg-background/90 backdrop-blur hover:bg-background" onClick={() => openEditModal(entry)}>
+                      <Edit2 className="h-4 w-4 text-foreground" />
                     </Button>
-                    <Button size="icon" variant="destructive" className="h-7 w-7 rounded-full shadow-sm" onClick={() => {
+                    <Button size="icon" variant="destructive" className="h-8 w-8 rounded-full shadow-sm" onClick={() => {
                       if (confirm('Delete this media entry?')) deleteMutation.mutate(entry.id);
                     }}>
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
 
-                  <div className="relative h-48 w-full bg-black group-hover:opacity-90 transition-opacity flex items-center justify-center overflow-hidden">
-                    {type === 'youtube' ? (
-                      <>
-                        <img src={`https://img.youtube.com/vi/${getYoutubeEmbedId(entry.url)}/hqdefault.jpg`} className="w-full h-full object-cover opacity-80" alt={entry.title} />
-                        <MonitorPlay className="w-12 h-12 text-red-500 absolute" />
-                      </>
-                    ) : type === 'video' ? (
-                      <>
-                        <video src={entry.url} className="w-full h-full object-cover opacity-70" muted />
-                        <Play className="w-12 h-12 text-white/80 absolute" />
-                      </>
+                  <div className="relative h-64 sm:h-72 w-full bg-black group-hover:opacity-95 transition-opacity flex items-center justify-center overflow-hidden">
+                    {displayType === 'youtube' ? (
+                      isPlaying ? (
+                        <iframe 
+                          src={`https://www.youtube.com/embed/${getYoutubeEmbedId(entry.media_url || '')}?autoplay=1`} 
+                          allow="autoplay; encrypted-media" 
+                          allowFullScreen 
+                          className="w-full h-full border-0" 
+                        />
+                      ) : (
+                        <div className="w-full h-full cursor-pointer relative" onClick={() => setPlayingId(entry.id)}>
+                          <img src={`https://img.youtube.com/vi/${getYoutubeEmbedId(entry.media_url || '')}/maxresdefault.jpg`} onError={(e) => (e.currentTarget.src = `https://img.youtube.com/vi/${getYoutubeEmbedId(entry.media_url || '')}/hqdefault.jpg`)} className="w-full h-full object-cover opacity-80 group-hover:scale-105 transition-transform duration-500" alt={entry.title} />
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="bg-red-600/90 rounded-full p-4 shadow-lg backdrop-blur-sm group-hover:scale-110 transition-transform">
+                              <Play className="w-8 h-8 text-white ml-1" />
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    ) : entry.type === 'video' || displayType === 'video' ? (
+                      isPlaying ? (
+                        <video src={entry.media_url} className="w-full h-full object-contain bg-black" controls autoPlay />
+                      ) : (
+                        <div className="w-full h-full cursor-pointer relative" onClick={() => setPlayingId(entry.id)}>
+                          <video src={entry.media_url} className="w-full h-full object-cover opacity-70 group-hover:scale-105 transition-transform duration-500" muted />
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <div className="bg-primary/90 rounded-full p-4 shadow-lg backdrop-blur-sm group-hover:scale-110 transition-transform">
+                              <Play className="w-8 h-8 text-white ml-1" />
+                            </div>
+                          </div>
+                        </div>
+                      )
                     ) : (
-                      <img src={entry.url} alt={entry.title} className="w-full h-full object-cover" />
+                      <img src={entry.media_url} alt={entry.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
                     )}
                   </div>
                   
-                  <div className="p-4">
-                    <Badge variant="outline" className="mb-2 text-[10px] uppercase tracking-wider font-bold bg-muted/50">{entry.category}</Badge>
-                    <h3 className="font-bold text-sm text-foreground line-clamp-2 leading-tight">{entry.title}</h3>
+                  <div className="p-5 bg-gradient-to-b from-background to-muted/20">
+                    <div className="flex justify-between items-center mb-3">
+                      <Badge variant="default" className="text-[10px] uppercase tracking-wider font-bold">{entry.category}</Badge>
+                      {entry.type === 'video' && <Badge variant="secondary" className="text-[10px]">Video</Badge>}
+                    </div>
+                    <h3 className="font-bold text-base text-foreground line-clamp-2 leading-tight">{entry.title}</h3>
+                    {entry.publisher && <p className="text-sm font-medium text-muted-foreground mt-2 flex items-center"><MonitorPlay className="w-4 h-4 mr-1.5 opacity-70" /> {entry.publisher}</p>}
                   </div>
                 </Card>
               );
@@ -221,42 +285,64 @@ export default function MediaGalleryPage() {
           <form onSubmit={handleSubmit} className="space-y-4 max-h-[75vh] overflow-y-auto pr-1">
             
             <div className="bg-muted/30 p-2 rounded-lg border border-border/50 flex gap-2">
-              <Button type="button" variant={mediaType === 'image' ? 'primary' : 'ghost'} size="sm" className="flex-1" onClick={() => setMediaType('image')}>
+              <Button type="button" variant={formData.type === 'image' ? 'primary' : 'ghost'} size="sm" className="flex-1" onClick={() => setFormData({ ...formData, type: 'image' })}>
                 <ImageIcon className="w-4 h-4 mr-2" /> Image
               </Button>
-              <Button type="button" variant={mediaType === 'video' ? 'primary' : 'ghost'} size="sm" className="flex-1" onClick={() => setMediaType('video')}>
-                <Video className="w-4 h-4 mr-2" /> Video File
-              </Button>
-              <Button type="button" variant={mediaType === 'youtube' ? 'primary' : 'ghost'} size="sm" className="flex-1" onClick={() => setMediaType('youtube')}>
-                <MonitorPlay className="w-4 h-4 mr-2" /> YouTube
+              <Button type="button" variant={formData.type === 'video' ? 'primary' : 'ghost'} size="sm" className="flex-1" onClick={() => setFormData({ ...formData, type: 'video' })}>
+                <Video className="w-4 h-4 mr-2" /> Video
               </Button>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <Input label="Title *" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} required placeholder="e.g. Noida Slum Class" />
-              <Input label="Category *" value={formData.category} onChange={(e) => setFormData({...formData, category: e.target.value})} required placeholder="e.g. activities, press" />
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-muted-foreground">Category *</label>
+                <select 
+                  className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                  value={formData.category} 
+                  onChange={(e) => setFormData({...formData, category: e.target.value as 'gallery' | 'press' | 'general'})}
+                  required
+                >
+                  <option value="gallery">Gallery</option>
+                  <option value="press">Press</option>
+                  <option value="general">General</option>
+                </select>
+              </div>
             </div>
 
-            {mediaType === 'youtube' ? (
-              <Input label="YouTube URL *" value={formData.url} onChange={(e) => setFormData({...formData, url: e.target.value})} required placeholder="https://youtube.com/watch?v=..." />
-            ) : (
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-muted-foreground">{mediaType === 'image' ? 'Upload Image' : 'Upload Video'}</label>
-                <div className="border-2 border-dashed border-border rounded-xl p-4 flex flex-col items-center justify-center bg-muted/20 relative">
-                  {uploadFile ? (
-                    <p className="text-sm font-bold text-primary">{uploadFile.name}</p>
-                  ) : formData.url ? (
-                    <p className="text-sm font-semibold text-muted-foreground break-all">{formData.url}</p>
-                  ) : (
-                    <div className="text-center">
-                      {mediaType === 'image' ? <ImageIcon className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" /> : <Video className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />}
-                      <p className="text-xs font-semibold">Click to select file</p>
-                    </div>
-                  )}
-                  <input type="file" accept={mediaType === 'image' ? 'image/*' : 'video/*'} onChange={(e) => { if(e.target.files) setUploadFile(e.target.files[0]) }} className="absolute inset-0 opacity-0 cursor-pointer" />
-                </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Input label="Publisher" value={formData.publisher || ''} onChange={(e) => setFormData({...formData, publisher: e.target.value})} placeholder="e.g. NDTV News (Optional)" />
+              <Input label="Order Index" type="number" value={formData.order_index} onChange={(e) => setFormData({...formData, order_index: parseInt(e.target.value) || 1})} required />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground">Media URL or Upload (For YouTube, just paste link)</label>
+              <Input 
+                value={formData.media_url} 
+                onChange={(e) => setFormData({...formData, media_url: e.target.value})} 
+                placeholder="https://... or click below to upload" 
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground">Upload File (Optional if URL provided)</label>
+              <div className="border-2 border-dashed border-border rounded-xl p-4 flex flex-col items-center justify-center bg-muted/20 relative">
+                {uploadFile ? (
+                  <p className="text-sm font-bold text-primary">{uploadFile.name}</p>
+                ) : (
+                  <div className="text-center">
+                    {formData.type === 'image' ? <ImageIcon className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" /> : <Video className="w-8 h-8 text-muted-foreground/40 mx-auto mb-2" />}
+                    <p className="text-xs font-semibold">Click to select file</p>
+                  </div>
+                )}
+                <input 
+                  type="file" 
+                  accept={formData.type === 'image' ? 'image/*' : 'video/*'} 
+                  onChange={(e) => { if(e.target.files) setUploadFile(e.target.files[0]) }} 
+                  className="absolute inset-0 opacity-0 cursor-pointer" 
+                />
               </div>
-            )}
+            </div>
 
             <Button type="submit" className="w-full font-bold h-10 mt-2" isLoading={isUploading || createMutation.isPending || updateMutation.isPending}>
               {isUploading ? 'Uploading Media...' : editingId ? 'Save Changes' : 'Add Media'}

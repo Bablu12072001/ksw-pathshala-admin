@@ -43,8 +43,10 @@ export interface TransparencyMetrics {
 }
 
 export interface PresignUploadPayload {
-  folder: string;
-  files: { filename: string; fileType?: string }[];
+  folder?: string;
+  files?: { filename: string; fileType?: string }[];
+  fileName?: string;
+  fileType?: string;
 }
 
 export interface SliderPayload {

@@ -315,6 +315,7 @@ export interface Event {
   title: string;
   description: string;
   date: string;
+  media?: { url: string; type: 'image' | 'video'; id?: string; _id?: string }[];
   registrations?: EventRegistration[];
   created_at?: string;
   updated_at?: string;
@@ -334,9 +335,13 @@ export interface ContactInquiry {
 // ── Media Entry ──────────────────────────────────────────────────────────────
 export interface MediaEntry {
   id: string;
+  media_url: string;
   title: string;
-  category: string;
-  url: string;
+  publisher?: string | null;
+  type: 'image' | 'video';
+  category: 'gallery' | 'press' | 'general';
+  order_index: number;
+  status: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -362,8 +367,10 @@ export interface AiInsight {
 
 // ── Presign Upload ───────────────────────────────────────────────────────────
 export interface PresignUploadPayload {
-  folder: string;
-  files: { filename: string; fileType?: string }[];
+  folder?: string;
+  files?: { filename: string; fileType?: string }[];
+  fileName?: string;
+  fileType?: string;
 }
 
 export interface PresignUploadResponse {
