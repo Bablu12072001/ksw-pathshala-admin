@@ -71,18 +71,35 @@ export interface Student {
 // ── Teacher ──────────────────────────────────────────────────────────────────
 export interface Teacher {
   id: string;
-  name: string;
+  fullName?: string;
+  name?: string;
   email: string;
   phone: string;
   qualification: string;
   assignedClass: string;
-  location: {
+  profileImage?: string | null;
+  branchId?: any;
+  classId?: any;
+  fcmToken?: string | null;
+  subject?: string | null;
+  address?: string | null;
+  aadharFront?: string | null;
+  aadharBack?: string | null;
+  resume?: string | null;
+  location?: {
     latitude: number;
     longitude: number;
     classroomName: string;
   };
-  status: 'Approved' | 'Pending Approval';
-  joiningDate: string;
+  gpsTargetLocation?: {
+    latitude: number;
+    longitude: number;
+    radius: number;
+  };
+  status: 'Approved' | 'Pending Approval' | 'active' | 'inactive' | 'pending';
+  joiningDate?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // ── Donation ─────────────────────────────────────────────────────────────────

@@ -28,6 +28,7 @@ export default function TeachersPage() {
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadingField, setUploadingField] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState('');
 
   // Form states
@@ -43,6 +44,11 @@ export default function TeachersPage() {
     branchId: '',
     classId: '',
     photoUrl: '',
+    subject: '',
+    address: '',
+    aadharFront: '',
+    aadharBack: '',
+    resume: '',
     latitude: '',
     longitude: '',
     radius: '200',
@@ -105,15 +111,20 @@ export default function TeachersPage() {
   const handleOpenEdit = (teacher: any) => {
     setSelectedTeacher(teacher);
     setFormData({
-      fullName: teacher.fullName || teacher.name,
-      email: teacher.email,
-      phone: teacher.phone,
+      fullName: teacher.fullName || teacher.name || '',
+      email: teacher.email || '',
+      phone: teacher.phone || '',
       password: teacher.password || '',
       qualification: teacher.qualification || '',
       assignedClass: teacher.assignedClass || '',
       branchId: teacher.branchId?.id || teacher.branchId?._id || (typeof teacher.branchId === 'string' ? teacher.branchId : ''),
       classId: teacher.classId?.id || teacher.classId?._id || (typeof teacher.classId === 'string' ? teacher.classId : ''),
       photoUrl: teacher.profileImage || teacher.photoUrl || '',
+      subject: teacher.subject || '',
+      address: teacher.address || '',
+      aadharFront: teacher.aadharFront || '',
+      aadharBack: teacher.aadharBack || '',
+      resume: teacher.resume || '',
       latitude: String(teacher.gpsTargetLocation?.latitude || teacher.location?.latitude || '0'),
       longitude: String(teacher.gpsTargetLocation?.longitude || teacher.location?.longitude || '0'),
       radius: String(teacher.gpsTargetLocation?.radius || '200'),
@@ -170,12 +181,29 @@ export default function TeachersPage() {
     const file = e.target.files?.[0];
     if (!file) return;
     setIsUploading(true);
+    setUploadingField('photoUrl');
     setUploadError('');
     const url = await performUpload(file, 'teachers');
     if (url) {
       setFormData(prev => ({ ...prev, photoUrl: url }));
     }
     setIsUploading(false);
+    setUploadingField(null);
+  };
+
+  const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>, fieldName: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setIsUploading(true);
+    setUploadingField(fieldName);
+    setUploadError('');
+    const folder = fieldName === 'resume' || fieldName.includes('aadhar') ? 'teachers/documents' : 'teachers';
+    const url = await performUpload(file, folder);
+    if (url) {
+      setFormData(prev => ({ ...prev, [fieldName]: url }));
+    }
+    setIsUploading(false);
+    setUploadingField(null);
   };
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -205,6 +233,11 @@ export default function TeachersPage() {
       branchId: formData.branchId,
       classId: formData.classId,
       profileImage: formData.photoUrl,
+      subject: formData.subject,
+      address: formData.address,
+      aadharFront: formData.aadharFront,
+      aadharBack: formData.aadharBack,
+      resume: formData.resume,
       gpsTargetLocation: {
         latitude: formData.latitude,
         longitude: formData.longitude,
@@ -227,6 +260,11 @@ export default function TeachersPage() {
         branchId: formData.branchId,
         classId: formData.classId,
         profileImage: formData.photoUrl,
+        subject: formData.subject,
+        address: formData.address,
+        aadharFront: formData.aadharFront,
+        aadharBack: formData.aadharBack,
+        resume: formData.resume,
         status: formData.status,
         gpsTargetLocation: {
           latitude: formData.latitude,
@@ -249,6 +287,11 @@ export default function TeachersPage() {
       branchId: '',
       classId: '',
       photoUrl: '',
+      subject: '',
+      address: '',
+      aadharFront: '',
+      aadharBack: '',
+      resume: '',
       latitude: '',
       longitude: '',
       radius: '200',
@@ -499,6 +542,22 @@ export default function TeachersPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <Input
+                label="Subject"
+                name="subject"
+                value={formData.subject}
+                onChange={handleFormChange}
+                placeholder="e.g. Mathematics"
+              />
+              <Input
+                label="Address"
+                name="address"
+                value={formData.address}
+                onChange={handleFormChange}
+                placeholder="Full address"
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Input
                 label="Qualifications *"
                 name="qualification"
                 required
@@ -567,6 +626,62 @@ export default function TeachersPage() {
                 onChange={handleFormChange}
               />
             </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground/90">Aadhar Front</label>
+                <div className="relative">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleDocumentUpload(e, 'aadharFront')}
+                    className="cursor-pointer file:text-xs file:font-semibold file:bg-primary/10 file:text-primary file:border-0 file:px-3 file:py-1 file:rounded-full hover:file:bg-primary/20 h-10"
+                    disabled={isUploading}
+                  />
+                  {uploadingField === 'aadharFront' && (
+                    <div className="absolute right-3 top-2.5">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    </div>
+                  )}
+                </div>
+                {formData.aadharFront && <a href={formData.aadharFront} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline">View Uploaded</a>}
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground/90">Aadhar Back</label>
+                <div className="relative">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleDocumentUpload(e, 'aadharBack')}
+                    className="cursor-pointer file:text-xs file:font-semibold file:bg-primary/10 file:text-primary file:border-0 file:px-3 file:py-1 file:rounded-full hover:file:bg-primary/20 h-10"
+                    disabled={isUploading}
+                  />
+                  {uploadingField === 'aadharBack' && (
+                    <div className="absolute right-3 top-2.5">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    </div>
+                  )}
+                </div>
+                {formData.aadharBack && <a href={formData.aadharBack} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline">View Uploaded</a>}
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground/90">Resume</label>
+                <div className="relative">
+                  <Input
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    onChange={(e) => handleDocumentUpload(e, 'resume')}
+                    className="cursor-pointer file:text-xs file:font-semibold file:bg-primary/10 file:text-primary file:border-0 file:px-3 file:py-1 file:rounded-full hover:file:bg-primary/20 h-10"
+                    disabled={isUploading}
+                  />
+                  {uploadingField === 'resume' && (
+                    <div className="absolute right-3 top-2.5">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    </div>
+                  )}
+                </div>
+                {formData.resume && <a href={formData.resume} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline">View Uploaded</a>}
+              </div>
+            </div>
             <LocationPicker 
               latitude={formData.latitude}
               longitude={formData.longitude}
@@ -613,6 +728,22 @@ export default function TeachersPage() {
                 placeholder="Leave blank to keep current"
                 value={formData.password}
                 onChange={handleFormChange}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                label="Subject"
+                name="subject"
+                value={formData.subject}
+                onChange={handleFormChange}
+                placeholder="e.g. Mathematics"
+              />
+              <Input
+                label="Address"
+                name="address"
+                value={formData.address}
+                onChange={handleFormChange}
+                placeholder="Full address"
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
@@ -679,6 +810,62 @@ export default function TeachersPage() {
                 value={formData.radius}
                 onChange={handleFormChange}
               />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground/90">Aadhar Front</label>
+                <div className="relative">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleDocumentUpload(e, 'aadharFront')}
+                    className="cursor-pointer file:text-xs file:font-semibold file:bg-primary/10 file:text-primary file:border-0 file:px-3 file:py-1 file:rounded-full hover:file:bg-primary/20 h-10"
+                    disabled={isUploading}
+                  />
+                  {uploadingField === 'aadharFront' && (
+                    <div className="absolute right-3 top-2.5">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    </div>
+                  )}
+                </div>
+                {formData.aadharFront && <a href={formData.aadharFront} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline">View Uploaded</a>}
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground/90">Aadhar Back</label>
+                <div className="relative">
+                  <Input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => handleDocumentUpload(e, 'aadharBack')}
+                    className="cursor-pointer file:text-xs file:font-semibold file:bg-primary/10 file:text-primary file:border-0 file:px-3 file:py-1 file:rounded-full hover:file:bg-primary/20 h-10"
+                    disabled={isUploading}
+                  />
+                  {uploadingField === 'aadharBack' && (
+                    <div className="absolute right-3 top-2.5">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    </div>
+                  )}
+                </div>
+                {formData.aadharBack && <a href={formData.aadharBack} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline">View Uploaded</a>}
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-foreground/90">Resume</label>
+                <div className="relative">
+                  <Input
+                    type="file"
+                    accept=".pdf,.doc,.docx"
+                    onChange={(e) => handleDocumentUpload(e, 'resume')}
+                    className="cursor-pointer file:text-xs file:font-semibold file:bg-primary/10 file:text-primary file:border-0 file:px-3 file:py-1 file:rounded-full hover:file:bg-primary/20 h-10"
+                    disabled={isUploading}
+                  />
+                  {uploadingField === 'resume' && (
+                    <div className="absolute right-3 top-2.5">
+                      <div className="h-4 w-4 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+                    </div>
+                  )}
+                </div>
+                {formData.resume && <a href={formData.resume} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline">View Uploaded</a>}
+              </div>
             </div>
             <LocationPicker 
               latitude={formData.latitude}
@@ -758,6 +945,34 @@ export default function TeachersPage() {
                   <Badge variant="outline" className="font-semibold text-xxs bg-secondary/35">
                     {viewData.classId?.name || viewData.assignedClass || 'N/A'}
                   </Badge>
+                </div>
+                <div>
+                  <p className="text-xxxxs text-muted-foreground uppercase tracking-wider">Subject</p>
+                  <p className="text-sm font-semibold">{viewData.subject || 'N/A'}</p>
+                </div>
+                <div className="col-span-2">
+                  <p className="text-xxxxs text-muted-foreground uppercase tracking-wider">Address</p>
+                  <p className="text-sm font-semibold">{viewData.address || 'N/A'}</p>
+                </div>
+                <div className="col-span-2 grid grid-cols-3 gap-2 mt-2">
+                  {viewData.aadharFront && (
+                    <div>
+                      <p className="text-xxxxs text-muted-foreground uppercase tracking-wider mb-1">Aadhar Front</p>
+                      <a href={viewData.aadharFront} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline">View Document</a>
+                    </div>
+                  )}
+                  {viewData.aadharBack && (
+                    <div>
+                      <p className="text-xxxxs text-muted-foreground uppercase tracking-wider mb-1">Aadhar Back</p>
+                      <a href={viewData.aadharBack} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline">View Document</a>
+                    </div>
+                  )}
+                  {viewData.resume && (
+                    <div>
+                      <p className="text-xxxxs text-muted-foreground uppercase tracking-wider mb-1">Resume</p>
+                      <a href={viewData.resume} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline">View Document</a>
+                    </div>
+                  )}
                 </div>
                 <div className="col-span-2">
                   <p className="text-xxxxs text-muted-foreground uppercase tracking-wider">GPS Target Location</p>
