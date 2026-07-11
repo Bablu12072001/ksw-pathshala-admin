@@ -30,13 +30,31 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [hydrated, setHydrated] = useState(false);
 
-  // Redirect if already logged in
+  // Sync user session and redirect if already logged in
   useEffect(() => {
-    if (user) {
+    const storedUser = localStorage.getItem('user_session');
+    if (storedUser && !user) {
+      try {
+        login(JSON.parse(storedUser));
+      } catch (err) {
+        console.error('Failed to parse user session', err);
+      }
+    }
+    setHydrated(true);
+  }, [login, user]);
+
+  useEffect(() => {
+    if (hydrated && user) {
       router.push('/dashboard');
     }
-  }, [user, router]);
+  }, [hydrated, user, router]);
+
+  // Prevent flash of login form if user is already authenticated
+  if (!hydrated || user) {
+    return <div className="min-h-screen bg-background" />;
+  }
 
   // ── Password login via real API ──────────────────────────────────────────────
   const handlePasswordSubmit = async (e: React.FormEvent) => {
