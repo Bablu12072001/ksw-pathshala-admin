@@ -341,6 +341,12 @@ export const campaignsService = {
   create: (payload: Record<string, unknown>) => apiClient.post('/api/admin/campaigns', payload),
   update: (id: string, payload: Record<string, unknown>) => apiClient.put(`/api/admin/campaigns/${id}`, payload),
   delete: (id: string) => apiClient.delete(`/api/admin/campaigns/${id}`),
+  addFaq: (campaignId: string, payload: { question: string; answer: string }) => 
+    apiClient.post(`/api/admin/campaigns/${campaignId}/faqs`, payload),
+  updateFaq: (campaignId: string, faqId: string, payload: { question: string; answer: string }) => 
+    apiClient.put(`/api/admin/campaigns/${campaignId}/faqs/${faqId}`, payload),
+  deleteFaq: (campaignId: string, faqId: string) => 
+    apiClient.delete(`/api/admin/campaigns/${campaignId}/faqs/${faqId}`),
 };
 
 // ─────────────────────────────────────────────────────────────────────────────

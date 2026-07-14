@@ -10,9 +10,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { user, login, theme, setTheme } = useAppStore();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [isMounted, setIsMounted] = useState(false);
 
   // Hydrate theme and auth state from localStorage
   useEffect(() => {
+    setIsMounted(true);
     // 1. Sync theme preference
     const storedTheme = localStorage.getItem('theme') as 'light' | 'dark' | null;
     const defaultTheme = storedTheme || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
@@ -31,13 +33,13 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
   // Auth Guard
   useEffect(() => {
-    if (!user) {
+    if (isMounted && !user) {
       router.push('/login');
     }
-  }, [user, router]);
+  }, [user, router, isMounted]);
 
-  // Prevent render if unauthenticated (will be redirected)
-  if (!user) {
+  // Prevent render if unauthenticated or not mounted yet
+  if (!isMounted || !user) {
     return (
       <div className="flex h-screen w-screen items-center justify-center bg-background">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />

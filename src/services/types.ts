@@ -300,6 +300,13 @@ export interface VolunteerTask {
 }
 
 // ── Campaign ─────────────────────────────────────────────────────────────────
+export interface CampaignFaq {
+  id?: string;
+  _id?: string;
+  question: string;
+  answer: string;
+}
+
 export interface Campaign {
   id: string;
   title: string;
@@ -312,6 +319,9 @@ export interface Campaign {
   isActive?: boolean;
   image?: string | null;
   video?: string | null;
+  youtubeVideoUrl?: string | null;
+  gallery?: { url: string; type: 'image' | 'video'; id?: string; _id?: string }[];
+  faqs?: CampaignFaq[];
   endDate?: string;
   created_at?: string;
   updated_at?: string;

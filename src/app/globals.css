@@ -180,3 +180,12 @@ body {
 .transition-all-custom {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
+
+/* Quill Editor Overrides */
+.ql-editor img {
+  max-width: 45% !important;
+  height: auto !important;
+  border-radius: 8px;
+  margin: 0.5rem;
+  display: inline-block;
+}

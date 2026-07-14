@@ -2,6 +2,13 @@
 
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import dynamic from 'next/dynamic';
+import 'react-quill-new/dist/quill.snow.css';
+
+const ReactQuill = dynamic(() => import('react-quill-new'), { 
+  ssr: false,
+  loading: () => <div className="h-[200px] w-full bg-muted/20 animate-pulse rounded-lg border border-border mb-12" />
+});
 import { 
   Megaphone, 
   Target, 
@@ -52,9 +59,12 @@ export default function CampaignsPage() {
     image: '',
     video: '', // can be s3 url or youtube url
     youtubeUrl: '', // transient state for UI input
+    faqs: [] as { question: string; answer: string; _id?: string; id?: string }[],
+    gallery: [] as { url: string; type: 'image' | 'video'; id?: string; _id?: string }[],
   });
 
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [galleryUploadFiles, setGalleryUploadFiles] = useState<File[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState('');
 
@@ -104,8 +114,11 @@ export default function CampaignsPage() {
       image: '',
       video: '',
       youtubeUrl: '',
+      faqs: [],
+      gallery: [],
     });
     setUploadFile(null);
+    setGalleryUploadFiles([]);
     setUploadError('');
     setMediaType('image');
   };
@@ -117,7 +130,10 @@ export default function CampaignsPage() {
     let currentMediaType: 'image' | 'video' | 'youtube' = 'image';
     let ytUrl = '';
     
-    if (campaign.video) {
+    if (campaign.youtubeVideoUrl) {
+      currentMediaType = 'youtube';
+      ytUrl = campaign.youtubeVideoUrl;
+    } else if (campaign.video) {
       if (campaign.video.includes('youtube.com') || campaign.video.includes('youtu.be')) {
         currentMediaType = 'youtube';
         ytUrl = campaign.video;
@@ -142,8 +158,11 @@ export default function CampaignsPage() {
       image: campaign.image || '',
       video: campaign.video || '',
       youtubeUrl: ytUrl,
+      faqs: campaign.faqs || [],
+      gallery: campaign.gallery || [],
     });
     setUploadFile(null);
+    setGalleryUploadFiles([]);
     setUploadError('');
     setIsModalOpen(true);
   };
@@ -202,40 +221,161 @@ export default function CampaignsPage() {
     
     let finalImageUrl = formData.image;
     let finalVideoUrl = formData.video;
+    let finalYoutubeUrl = formData.youtubeUrl;
     
-    if (mediaType === 'youtube') {
-      const embedUrl = getYouTubeEmbedUrl(formData.youtubeUrl);
-      if (embedUrl) {
-        finalVideoUrl = embedUrl;
-        finalImageUrl = ''; // clear image if we switch to youtube
-      } else if (formData.youtubeUrl) {
+    // Validate YouTube URL if provided
+    if (formData.youtubeUrl) {
+      if (!getYouTubeEmbedUrl(formData.youtubeUrl)) {
         setUploadError('Invalid YouTube URL');
         return;
       }
-    } else if (uploadFile) {
+      finalYoutubeUrl = formData.youtubeUrl;
+      const videoIdMatch = formData.youtubeUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([^&?]+)/);
+      if (!finalImageUrl && !uploadFile && videoIdMatch && videoIdMatch[1]) {
+        // Only extract YouTube thumbnail if no other image is provided
+        finalImageUrl = `https://img.youtube.com/vi/${videoIdMatch[1]}/hqdefault.jpg`;
+      }
+    } else {
+      finalYoutubeUrl = '';
+    }
+
+    if (uploadFile) {
       const uploadedUrl = await performUpload();
       if (!uploadedUrl) return; 
       
       if (mediaType === 'image') {
         finalImageUrl = uploadedUrl;
-        finalVideoUrl = ''; // Clear video if switching to image
+        finalVideoUrl = '';
       } else if (mediaType === 'video') {
         finalVideoUrl = uploadedUrl;
-        finalImageUrl = ''; // Clear image if switching to video
+        finalImageUrl = '';
       }
     } else {
-       // if they switched tabs but didn't upload a new file, we should clear the other state
-       if (mediaType === 'image') finalVideoUrl = '';
-       if (mediaType === 'video') finalImageUrl = '';
+       if (mediaType === 'image') { finalVideoUrl = ''; }
+       if (mediaType === 'video') { finalImageUrl = ''; }
     }
 
+    let finalGallery = [...(formData.gallery || [])];
+    if (galleryUploadFiles.length > 0) {
+      setIsUploading(true);
+      try {
+        const presignRes = await mediaService.generatePresignedUrls({
+          folder: 'campaigns/gallery',
+          files: galleryUploadFiles.map(f => ({ filename: f.name, fileType: f.type }))
+        });
+        
+        const filesData = presignRes.data?.files || [];
+        
+        await Promise.all(
+          filesData.map(async (fileData: any, idx: number) => {
+            const file = galleryUploadFiles[idx];
+            const uploadRes = await fetch(fileData.uploadUrl, {
+              method: 'PUT',
+              body: file,
+              headers: { 'Content-Type': file.type }
+            });
+            if (!uploadRes.ok) throw new Error('Gallery upload failed');
+            
+            finalGallery.push({
+              url: fileData.imageUrl,
+              type: file.type.startsWith('video/') ? 'video' : 'image'
+            });
+          })
+        );
+      } catch (err: any) {
+        setUploadError(err.message || 'Gallery upload failed.');
+        setIsUploading(false);
+        return;
+      } finally {
+        setIsUploading(false);
+      }
+    }
+
+    const { youtubeUrl, ...restFormData } = formData;
+    
+    let finalDescription = restFormData.description || '';
+    
+    // Extract base64 images from description, upload to S3, and replace in HTML
+    const base64Regex = /<img[^>]+src="data:image\/([^;]+);base64,([^"]+)"[^>]*>/g;
+    let match;
+    const base64Images: { fullMatch: string, ext: string, data: string, url?: string }[] = [];
+    
+    while ((match = base64Regex.exec(finalDescription)) !== null) {
+      base64Images.push({
+        fullMatch: match[0],
+        ext: match[1],
+        data: match[2],
+      });
+    }
+
+    if (base64Images.length > 0) {
+      setIsUploading(true);
+      try {
+        const presignRes = await mediaService.generatePresignedUrls({
+          folder: 'campaigns/description',
+          files: base64Images.map((img, i) => ({ 
+            filename: `desc-img-${Date.now()}-${i}.${img.ext}`, 
+            fileType: `image/${img.ext}` 
+          }))
+        });
+        
+        const filesData = presignRes.data?.files || [];
+        
+        await Promise.all(
+          filesData.map(async (fileData: any, idx: number) => {
+            const imgInfo = base64Images[idx];
+            
+            // Convert base64 to blob
+            const byteString = atob(imgInfo.data);
+            const ab = new ArrayBuffer(byteString.length);
+            const ia = new Uint8Array(ab);
+            for (let i = 0; i < byteString.length; i++) {
+              ia[i] = byteString.charCodeAt(i);
+            }
+            const blob = new Blob([ab], { type: `image/${imgInfo.ext}` });
+
+            const uploadRes = await fetch(fileData.uploadUrl, {
+              method: 'PUT',
+              body: blob,
+              headers: { 'Content-Type': `image/${imgInfo.ext}` }
+            });
+            if (!uploadRes.ok) throw new Error('Description image upload failed');
+            
+            imgInfo.url = fileData.imageUrl;
+          })
+        );
+        
+        // Replace base64 strings with S3 URLs in HTML
+        for (const img of base64Images) {
+          if (img.url) {
+            const newImgTag = img.fullMatch.replace(`data:image/${img.ext};base64,${img.data}`, img.url);
+            finalDescription = finalDescription.replace(img.fullMatch, newImgTag);
+          }
+        }
+      } catch (err: any) {
+        setUploadError(err.message || 'Description image upload failed.');
+        setIsUploading(false);
+        return;
+      } finally {
+        setIsUploading(false);
+      }
+    }
+    
+    // Add inline styles to any images in the rich text description so they are responsive everywhere
+    const responsiveDescription = finalDescription 
+      ? finalDescription.replace(/<img /g, '<img style="max-width: 100%; height: auto; border-radius: 8px;" ')
+      : finalDescription;
+
     const payload = { 
-      ...formData, 
+      ...restFormData, 
+      description: responsiveDescription,
       targetAmount: Number(formData.targetAmount) || 0,
       raisedAmount: Number(formData.raisedAmount) || 0,
       supportersCount: Number(formData.supportersCount) || 0,
       image: finalImageUrl,
       video: finalVideoUrl,
+      youtubeVideoUrl: finalYoutubeUrl,
+      gallery: finalGallery,
       // Formatting date back to ISO string if provided
       endDate: formData.endDate ? new Date(formData.endDate).toISOString() : undefined
     };
@@ -249,10 +389,19 @@ export default function CampaignsPage() {
 
   // Render correct media component for campaign card
   const renderCardMedia = (campaign: Campaign) => {
-    if (campaign.video && (campaign.video.includes('youtube.com') || campaign.video.includes('youtu.be'))) {
+    if (campaign.image) {
+      return (
+        <img
+          src={campaign.image}
+          alt={campaign.title}
+          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+        />
+      );
+    } else if (campaign.youtubeVideoUrl || (campaign.video && (campaign.video.includes('youtube.com') || campaign.video.includes('youtu.be')))) {
+      const ytSrc = campaign.youtubeVideoUrl ? getYouTubeEmbedUrl(campaign.youtubeVideoUrl) : getYouTubeEmbedUrl(campaign.video!);
       return (
         <iframe 
-          src={campaign.video}
+          src={ytSrc || ''}
           className="w-full h-full object-cover pointer-events-none"
           allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
           allowFullScreen
@@ -264,14 +413,6 @@ export default function CampaignsPage() {
           src={campaign.video}
           className="w-full h-full object-cover"
           muted loop playsInline
-        />
-      );
-    } else if (campaign.image) {
-      return (
-        <img
-          src={campaign.image}
-          alt={campaign.title}
-          className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
       );
     } else {
@@ -362,7 +503,9 @@ export default function CampaignsPage() {
                   <div className="p-5 flex flex-col flex-grow">
                     <h3 className="text-lg font-bold text-foreground line-clamp-1 mb-1">{campaign.title}</h3>
                     <p className="text-sm text-muted-foreground line-clamp-2 mb-4 flex-grow">
-                      {campaign.description || 'No description provided.'}
+                      {campaign.description 
+                        ? campaign.description.replace(/<[^>]*>?/gm, '').replace(/&nbsp;/g, ' ')
+                        : 'No description provided.'}
                     </p>
 
                     {/* Stats & Progress */}
@@ -430,44 +573,11 @@ export default function CampaignsPage() {
                  >
                    <VideoIcon className="w-3.5 h-3.5 mr-1.5" /> Upload Video
                  </button>
-                 <button
-                   type="button"
-                   onClick={() => setMediaType('youtube')}
-                   className={`flex-1 py-1.5 text-xs font-bold rounded-md flex items-center justify-center transition-all ${mediaType === 'youtube' ? 'bg-[#FF0000] text-white shadow-sm' : 'text-muted-foreground hover:bg-muted/50'}`}
-                 >
-                   <YoutubeIcon className="w-3.5 h-3.5 mr-1.5" /> YouTube
-                 </button>
                </div>
             </div>
 
             {/* Media Upload Area */}
             <div className="space-y-1.5">
-              {mediaType === 'youtube' ? (
-                <div className="space-y-3">
-                  <Input
-                    label="YouTube URL"
-                    value={formData.youtubeUrl}
-                    onChange={(e) => setFormData({ ...formData, youtubeUrl: e.target.value })}
-                    placeholder="https://www.youtube.com/watch?v=..."
-                  />
-                  {formData.youtubeUrl && (
-                    <div className="relative w-full h-40 rounded-lg overflow-hidden border border-border">
-                      {getYouTubeEmbedUrl(formData.youtubeUrl) ? (
-                        <iframe 
-                          src={getYouTubeEmbedUrl(formData.youtubeUrl)!}
-                          className="w-full h-full"
-                          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                          allowFullScreen
-                        />
-                      ) : (
-                        <div className="w-full h-full bg-muted flex items-center justify-center">
-                          <p className="text-xs text-muted-foreground">Preview not available (invalid URL)</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              ) : (
                 <div className="border-2 border-dashed border-border rounded-xl p-4 flex flex-col items-center justify-center bg-muted/20 relative group hover:bg-muted/40 transition-colors">
                   {uploadFile ? (
                     <div className="text-center">
@@ -509,10 +619,34 @@ export default function CampaignsPage() {
                     onChange={handleFileChange}
                   />
                 </div>
-              )}
               {uploadError && (
                 <div className="flex items-center text-destructive text-xs font-semibold mt-1">
                   <AlertCircle className="w-3.5 h-3.5 mr-1" /> {uploadError}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-1.5 mt-4">
+              <Input
+                label="YouTube URL (Optional)"
+                value={formData.youtubeUrl}
+                onChange={(e) => setFormData({ ...formData, youtubeUrl: e.target.value })}
+                placeholder="https://www.youtube.com/watch?v=..."
+              />
+              {formData.youtubeUrl && (
+                <div className="relative w-full h-40 rounded-lg overflow-hidden border border-border mt-2">
+                  {getYouTubeEmbedUrl(formData.youtubeUrl) ? (
+                    <iframe 
+                      src={getYouTubeEmbedUrl(formData.youtubeUrl)!}
+                      className="w-full h-full"
+                      allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                      allowFullScreen
+                    />
+                  ) : (
+                    <div className="w-full h-full bg-muted flex items-center justify-center">
+                      <p className="text-xs text-muted-foreground">Preview not available (invalid URL)</p>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -527,14 +661,24 @@ export default function CampaignsPage() {
             
             <div className="flex flex-col space-y-1.5">
               <label className="text-xs font-semibold text-muted-foreground">Description *</label>
-              <textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                required
-                rows={3}
-                placeholder="Describe the campaign purpose..."
-                className="flex w-full rounded-lg border border-border bg-input/50 px-3 py-2 text-sm placeholder:text-muted-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary/50 transition-all duration-200"
-              />
+              <div className="bg-white dark:bg-muted/10 rounded-lg overflow-hidden border border-border">
+                <ReactQuill
+                  theme="snow"
+                  value={formData.description}
+                  onChange={(content) => setFormData({ ...formData, description: content })}
+                  placeholder="Describe the campaign purpose... (Images, bold text, lists supported)"
+                  className="h-[150px] mb-12"
+                  modules={{
+                    toolbar: [
+                      [{ 'header': [1, 2, 3, false] }],
+                      ['bold', 'italic', 'underline', 'strike'],
+                      [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                      ['link', 'image'],
+                      ['clean']
+                    ],
+                  }}
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
@@ -592,13 +736,169 @@ export default function CampaignsPage() {
               />
             </div>
 
+            {/* Gallery Section */}
+            <div className="space-y-3 pt-2 pb-2 border-t border-border mt-4">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-bold text-foreground">Gallery</label>
+                <div>
+                  <input
+                    type="file"
+                    multiple
+                    accept="image/*,video/*"
+                    className="hidden"
+                    id="gallery-upload"
+                    onChange={(e) => {
+                      if (e.target.files) {
+                        setGalleryUploadFiles(prev => [...prev, ...Array.from(e.target.files!)]);
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => document.getElementById('gallery-upload')?.click()}
+                    className="h-8 text-xs"
+                  >
+                    <Plus className="w-3 h-3 mr-1" /> Add Media
+                  </Button>
+                </div>
+              </div>
+
+              {/* Display existing gallery items */}
+              {formData.gallery && formData.gallery.length > 0 && (
+                <div className="grid grid-cols-4 gap-2">
+                  {formData.gallery.map((item, idx) => (
+                    <div key={`existing-${idx}`} className="relative group rounded-md overflow-hidden aspect-square bg-muted">
+                      {item.type === 'video' ? (
+                        <video src={item.url} className="w-full h-full object-cover" />
+                      ) : (
+                        <img src={item.url} className="w-full h-full object-cover" />
+                      )}
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => {
+                          const newGallery = [...formData.gallery];
+                          newGallery.splice(idx, 1);
+                          setFormData({ ...formData, gallery: newGallery });
+                        }}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Display pending gallery uploads */}
+              {galleryUploadFiles.length > 0 && (
+                <div className="grid grid-cols-4 gap-2 mt-2">
+                  {galleryUploadFiles.map((file, idx) => {
+                    const objectUrl = URL.createObjectURL(file);
+                    return (
+                      <div key={`pending-${idx}`} className="relative group rounded-md overflow-hidden aspect-square bg-muted flex items-center justify-center border-2 border-dashed border-primary">
+                        {file.type.startsWith('video/') ? (
+                          <video src={objectUrl} className="w-full h-full object-cover opacity-60" />
+                        ) : (
+                          <img src={objectUrl} className="w-full h-full object-cover opacity-60" />
+                        )}
+                        <span className="absolute inset-0 flex items-center justify-center text-[10px] text-center p-1 text-white font-bold bg-black/40 break-words drop-shadow-md pointer-events-none">
+                          New
+                        </span>
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-1 right-1 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                          onClick={() => {
+                            const newFiles = [...galleryUploadFiles];
+                            newFiles.splice(idx, 1);
+                            setGalleryUploadFiles(newFiles);
+                          }}
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-3 pt-2 pb-2 border-t border-border mt-4">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-bold text-foreground">FAQs</label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setFormData({ ...formData, faqs: [...formData.faqs, { question: '', answer: '' }] })}
+                  className="h-8 text-xs"
+                >
+                  <Plus className="w-3 h-3 mr-1" /> Add FAQ
+                </Button>
+              </div>
+              {formData.faqs.map((faq, index) => (
+                <div key={index} className="flex gap-2 items-start bg-muted/20 p-3 rounded-lg border border-border">
+                  <div className="flex-1 space-y-2">
+                    <Input
+                      placeholder="Question"
+                      value={faq.question}
+                      onChange={(e) => {
+                        const newFaqs = [...formData.faqs];
+                        newFaqs[index].question = e.target.value;
+                        setFormData({ ...formData, faqs: newFaqs });
+                      }}
+                      className="h-8"
+                    />
+                    <Input
+                      placeholder="Answer"
+                      value={faq.answer}
+                      onChange={(e) => {
+                        const newFaqs = [...formData.faqs];
+                        newFaqs[index].answer = e.target.value;
+                        setFormData({ ...formData, faqs: newFaqs });
+                      }}
+                      className="h-8"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="text-destructive h-8 w-8 hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => {
+                      const newFaqs = [...formData.faqs];
+                      newFaqs.splice(index, 1);
+                      setFormData({ ...formData, faqs: newFaqs });
+                    }}
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+
             <div className="pt-2">
+              {uploadError && (
+                <div className="mb-3 p-2 bg-destructive/10 border border-destructive/20 rounded text-destructive text-sm font-semibold flex items-center">
+                  <AlertCircle className="w-4 h-4 mr-2" />
+                  {uploadError}
+                </div>
+              )}
               <Button 
                 type="submit" 
                 className="w-full font-bold h-10" 
                 isLoading={isUploading || createMutation.isPending || updateMutation.isPending}
               >
-                {isUploading ? 'Uploading Media...' : editingId ? 'Save Changes' : 'Create Campaign'}
+                {isUploading 
+                  ? 'Uploading Media...' 
+                  : (createMutation.isPending || updateMutation.isPending)
+                    ? (editingId ? 'Saving Changes...' : 'Creating Campaign...')
+                    : (editingId ? 'Save Changes' : 'Create Campaign')}
               </Button>
             </div>
           </form>
