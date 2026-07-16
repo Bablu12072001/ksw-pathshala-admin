@@ -151,8 +151,7 @@ export default function AttendancePage() {
               tabs={[
                 { title: 'Student Directory', path: '/students', icon: Users },
                 { title: 'Attendance', path: '/attendance', icon: CalendarCheck },
-                { title: 'Branches', path: '/branches', icon: Building },
-                { title: 'Classes', path: '/classes', icon: BookOpen }
+                { title: 'Branches', path: '/branches', icon: Building }
               ]}
             />
           </div>

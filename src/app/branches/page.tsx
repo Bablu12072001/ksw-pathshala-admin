@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Dialog } from '@/components/ui/dialog';
 import { Table, TableHeader, TableBody, TableHead, TableRow, TableCell } from '@/components/ui/table';
 import { Pagination } from '@/components/ui/pagination';
-import { branchesService } from '@/services';
+import { branchesService, classesService } from '@/services';
 
 export default function BranchesPage() {
   const queryClient = useQueryClient();
@@ -23,6 +23,8 @@ export default function BranchesPage() {
   const [isAddOpen, setIsAddOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const [isClassesOpen, setIsClassesOpen] = useState(false);
+  const [isAddingClass, setIsAddingClass] = useState(false);
 
   // Form states
   const [selectedBranch, setSelectedBranch] = useState<any>(null);
@@ -31,6 +33,7 @@ export default function BranchesPage() {
     code: '',
     location: '',
   });
+  const [newClassData, setNewClassData] = useState({ name: '', code: '' });
 
   // 1. Fetch Branches
   const { data: branchesData, isLoading } = useQuery({
@@ -67,6 +70,28 @@ export default function BranchesPage() {
     },
   });
 
+  // Classes for selected branch
+  const { data: branchClassesData, isLoading: isLoadingClasses } = useQuery({
+    queryKey: ['classes', selectedBranch?.id],
+    queryFn: () => classesService.getAll({ branchId: selectedBranch?.id }).then((r) => r.data),
+    enabled: !!selectedBranch?.id && isClassesOpen,
+  });
+
+  const branchClassesList = Array.isArray(branchClassesData) ? branchClassesData : (branchClassesData?.items || branchClassesData?.classes || []);
+  const isDuplicateClass = newClassData.name && newClassData.code && branchClassesList.some((cls: any) => 
+    cls.name.toLowerCase() === newClassData.name.trim().toLowerCase() ||
+    cls.code.toLowerCase() === newClassData.code.trim().toLowerCase()
+  );
+
+  const createClassMutation = useMutation({
+    mutationFn: (newClass: any) => classesService.create({ ...newClass, branchId: selectedBranch?.id }).then((r) => r.data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['classes', selectedBranch?.id] });
+      setNewClassData({ name: '', code: '' });
+      setIsAddingClass(false);
+    },
+  });
+
   // Action triggers
   const handleOpenAdd = () => {
     resetForm();
@@ -86,6 +111,13 @@ export default function BranchesPage() {
   const handleOpenDelete = (branch: any) => {
     setSelectedBranch(branch);
     setIsDeleteOpen(true);
+  };
+
+  const handleOpenClasses = (branch: any) => {
+    setSelectedBranch(branch);
+    setIsClassesOpen(true);
+    setIsAddingClass(false);
+    setNewClassData({ name: '', code: '' });
   };
 
   const handleDelete = () => {
@@ -133,8 +165,7 @@ export default function BranchesPage() {
               tabs={[
                 { title: 'Student Directory', path: '/students', icon: Users },
                 { title: 'Attendance', path: '/attendance', icon: CalendarCheck },
-                { title: 'Branches', path: '/branches', icon: Building },
-                { title: 'Classes', path: '/classes', icon: BookOpen }
+                { title: 'Branches', path: '/branches', icon: Building }
               ]}
             />
           </div>
@@ -212,6 +243,14 @@ export default function BranchesPage() {
                       </TableCell>
                       <TableCell className="py-3.5 text-right whitespace-nowrap">
                         <div className="flex items-center justify-end space-x-1">
+                          <Button
+                            variant="ghost"
+                            onClick={() => handleOpenClasses(branch)}
+                            className="h-8 px-2.5 text-xs text-primary hover:bg-primary/10"
+                            title="View Classes"
+                          >
+                            <BookOpen className="h-3.5 w-3.5" />
+                          </Button>
                           <Button
                             variant="ghost"
                             onClick={() => handleOpenEdit(branch)}
@@ -339,6 +378,71 @@ export default function BranchesPage() {
                 Delete
               </Button>
             </div>
+          </div>
+        </Dialog>
+
+        {/* DIALOG: VIEW/ADD CLASSES */}
+        <Dialog isOpen={isClassesOpen} onClose={() => setIsClassesOpen(false)} title={`Classes in ${selectedBranch?.name}`}>
+          <div className="space-y-4">
+            {!isAddingClass ? (
+              <div className="flex justify-between items-center">
+                <h3 className="text-sm font-semibold">Class List</h3>
+                <Button size="sm" onClick={() => setIsAddingClass(true)} className="h-8 text-xs">
+                  <Plus className="mr-1 h-3 w-3" /> Add Class
+                </Button>
+              </div>
+            ) : (
+              <Card className="p-3 mb-4 bg-muted/30">
+                <h4 className="text-xs font-bold mb-3">Add New Class</h4>
+                <div className="space-y-3">
+                  <Input
+                    label="Class Name *"
+                    name="name"
+                    placeholder="e.g. Grade 5"
+                    value={newClassData.name}
+                    onChange={(e) => setNewClassData({ ...newClassData, name: e.target.value })}
+                  />
+                  <Input
+                    label="Class Code *"
+                    name="code"
+                    placeholder="e.g. G5"
+                    value={newClassData.code}
+                    onChange={(e) => setNewClassData({ ...newClassData, code: e.target.value })}
+                  />
+                  {isDuplicateClass && (
+                    <p className="text-[10px] text-destructive font-medium">A class with this name or code already exists in this branch.</p>
+                  )}
+                  <div className="flex space-x-2 justify-end pt-2">
+                    <Button variant="outline" size="sm" onClick={() => setIsAddingClass(false)}>Cancel</Button>
+                    <Button size="sm" onClick={() => createClassMutation.mutate(newClassData)} isLoading={createClassMutation.isPending} disabled={!newClassData.name || !newClassData.code || isDuplicateClass}>
+                      Save Class
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            )}
+
+            {isLoadingClasses ? (
+              <div className="flex justify-center p-4">
+                <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              </div>
+            ) : (() => {
+              if (branchClassesList.length === 0) {
+                return <div className="text-center py-6 text-xs text-muted-foreground">No classes found in this branch.</div>;
+              }
+              return (
+                <div className="max-h-60 overflow-y-auto pr-2 space-y-2">
+                  {branchClassesList.map((cls: any) => (
+                    <div key={cls.id} className="flex justify-between items-center p-2.5 border rounded-md bg-card">
+                      <div>
+                        <p className="font-semibold text-xs text-foreground">{cls.name}</p>
+                        <p className="text-[10px] text-muted-foreground">Code: {cls.code}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              );
+            })()}
           </div>
         </Dialog>
 

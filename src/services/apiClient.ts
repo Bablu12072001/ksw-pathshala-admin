@@ -50,7 +50,9 @@ apiClient.interceptors.request.use(
           if (parsed?.token) {
             if (isTokenExpired(parsed.token)) {
               localStorage.removeItem('user_session');
-              window.location.href = '/login';
+              if (window.location.pathname !== '/login') {
+                window.location.href = '/login';
+              }
               return Promise.reject(new Error('Token expired'));
             }
             config.headers.Authorization = `Bearer ${parsed.token}`;
@@ -94,7 +96,9 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401 && typeof window !== 'undefined') {
       // Clear stale session and bounce to login
       localStorage.removeItem('user_session');
-      window.location.href = '/login';
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(error);
   }
