@@ -1,21 +1,25 @@
+'use client';
+
 import React, { useEffect, useState } from 'react';
-import { MapContainer, TileLayer, Marker, useMapEvents, LayersControl } from 'react-leaflet';
+import { MapContainer, TileLayer, Marker, useMapEvents, LayersControl, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import { GeoSearchControl, OpenStreetMapProvider } from 'leaflet-geosearch';
 import 'leaflet/dist/leaflet.css';
 import 'leaflet-geosearch/dist/geosearch.css';
 
-// Fix for default marker icon in leaflet with Next.js/Webpack
-const DefaultIcon = L.icon({
-  iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-  iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-  shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-  iconSize: [25, 41],
-  iconAnchor: [12, 41],
-  popupAnchor: [1, -34],
-  shadowSize: [41, 41]
+// Modern custom marker using Lucide icon styling
+const customIcon = L.divIcon({
+  className: 'custom-leaflet-marker',
+  html: `<div style="color: #4f46e5; filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.3));">
+          <svg xmlns="http://www.w3.org/2000/svg" width="36" height="36" viewBox="0 0 24 24" fill="#4f46e5" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path>
+            <circle cx="12" cy="10" r="3" fill="white"></circle>
+          </svg>
+         </div>`,
+  iconSize: [36, 36],
+  iconAnchor: [18, 36],
+  popupAnchor: [0, -36],
 });
-L.Marker.prototype.options.icon = DefaultIcon;
 
 interface MapComponentProps {
   latitude: string;
@@ -23,16 +27,16 @@ interface MapComponentProps {
   onLocationSelect: (lat: string, lng: string) => void;
 }
 
-function SearchField() {
-  const map = useMapEvents({});
+function SearchField({ setPosition }: { setPosition: (pos: L.LatLng) => void }) {
+  const map = useMap();
   useEffect(() => {
+    // Check if control already exists
+    if (document.querySelector('.leaflet-control-geosearch')) return;
+
     const provider = new OpenStreetMapProvider({
-      params: {
-        countrycodes: 'in' // Constrain to India
-      }
+      params: { countrycodes: 'in' } // Constrain to India
     });
     
-    // Create control
     const searchControl = new (GeoSearchControl as any)({
       provider: provider,
       style: 'bar',
@@ -47,11 +51,21 @@ function SearchField() {
     
     map.addControl(searchControl);
     
-    return () => {
-      map.removeControl(searchControl);
+    const handleLocationSelect = (e: any) => {
+      if (e && e.location) {
+        const pos = new L.LatLng(e.location.y, e.location.x);
+        setPosition(pos);
+        map.flyTo(pos, 15, { animate: true, duration: 1 });
+      }
     };
-  }, [map]);
-
+    
+    map.on('geosearch/showlocation', handleLocationSelect);
+    
+    return () => { 
+      map.removeControl(searchControl); 
+      map.off('geosearch/showlocation', handleLocationSelect);
+    };
+  }, [map, setPosition]);
   return null;
 }
 
@@ -59,48 +73,46 @@ function LocationMarker({ position, setPosition }: { position: L.LatLng | null, 
   const map = useMapEvents({
     click(e) {
       setPosition(e.latlng);
-      map.flyTo(e.latlng, map.getZoom());
+      map.flyTo(e.latlng, map.getZoom(), { animate: true, duration: 0.8 });
     },
   });
 
-  // Re-center if position changes externally
   useEffect(() => {
     if (position) {
-      map.flyTo(position, map.getZoom());
+      map.flyTo(position, map.getZoom(), { animate: true, duration: 0.8 });
     }
   }, [position, map]);
 
   return position === null ? null : (
-    <Marker position={position}></Marker>
+    <Marker position={position} icon={customIcon} />
   );
 }
 
-// 3. Current Location Control
 function CurrentLocationControl({ setPosition }: { setPosition: (pos: L.LatLng) => void }) {
   const map = useMapEvents({
     locationfound(e) {
       setPosition(e.latlng);
-      map.flyTo(e.latlng, 15);
+      map.flyTo(e.latlng, 15, { animate: true, duration: 1 });
     },
     locationerror(e) {
-      alert("Could not access your location. Please check your browser permissions.");
+      console.error(e.message);
     }
   });
 
   return (
-    <div className="leaflet-top leaflet-left" style={{ top: '80px' }}>
+    <div className="leaflet-top leaflet-left" style={{ top: '80px', zIndex: 1000 }}>
       <div className="leaflet-control leaflet-bar">
         <a 
           href="#"
-          className="flex items-center justify-center bg-white text-black hover:bg-gray-100" 
+          className="flex items-center justify-center bg-white hover:bg-gray-50 transition-colors" 
           title="Use my current location"
           onClick={(e) => {
             e.preventDefault();
             map.locate({ setView: false, maxZoom: 16 });
           }}
-          style={{ width: '30px', height: '30px', display: 'flex' }}
+          style={{ width: '34px', height: '34px', display: 'flex' }}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-primary"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-indigo-600"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
         </a>
       </div>
     </div>
@@ -108,7 +120,7 @@ function CurrentLocationControl({ setPosition }: { setPosition: (pos: L.LatLng) 
 }
 
 export default function MapComponent({ latitude, longitude, onLocationSelect }: MapComponentProps) {
-  const defaultCenter: L.LatLngExpression = [28.6139, 77.2090]; // New Delhi default
+  const defaultCenter: L.LatLngExpression = [28.6139, 77.2090]; // New Delhi
   const [position, setPosition] = useState<L.LatLng | null>(null);
 
   useEffect(() => {
@@ -127,9 +139,15 @@ export default function MapComponent({ latitude, longitude, onLocationSelect }: 
   const center = position || defaultCenter;
 
   return (
-    <div className="w-full h-[350px] rounded-xl overflow-hidden border border-border/50 relative z-0 shadow-sm">
+    <div className="w-full h-[380px] rounded-2xl overflow-hidden border border-border/60 relative z-0 shadow-sm ring-1 ring-black/5">
       <MapContainer center={center} zoom={13} scrollWheelZoom={true} style={{ height: '100%', width: '100%' }}>
         <LayersControl position="bottomright">
+          <LayersControl.BaseLayer name="Modern Light (CartoDB)">
+            <TileLayer
+              attribution='&copy; <a href="https://carto.com/">CartoDB</a>'
+              url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png"
+            />
+          </LayersControl.BaseLayer>
           <LayersControl.BaseLayer checked name="Street Map (OSM)">
             <TileLayer
               attribution='&copy; OpenStreetMap'
@@ -138,13 +156,14 @@ export default function MapComponent({ latitude, longitude, onLocationSelect }: 
           </LayersControl.BaseLayer>
           <LayersControl.BaseLayer name="Satellite View">
             <TileLayer
-              attribution='&copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community'
-              url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
+              attribution='&copy; Google Maps'
+              url="https://mt1.google.com/vt/lyrs=y&x={x}&y={y}&z={z}"
+              maxZoom={20}
             />
           </LayersControl.BaseLayer>
         </LayersControl>
         
-        <SearchField />
+        <SearchField setPosition={handleSetPosition} />
         <LocationMarker position={position} setPosition={handleSetPosition} />
         <CurrentLocationControl setPosition={handleSetPosition} />
       </MapContainer>
